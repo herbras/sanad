@@ -4,25 +4,29 @@ defmodule Sanad.Cogs.Agent do
 
   Invokes a provider CLI and returns its response as `%Sanad.Output.Agent{}`:
 
-  * `:pi` (default) — `pi --mode json -p [--model M] [--system-prompt S]
-    [--append-system-prompt S] (--fork SESSION | --no-session)`; the prompt goes
+  * `:pi` (default) runs `pi --mode json -p [--model M] [--system-prompt S]
+    [--append-system-prompt S] (--fork SESSION | --no-session)`. The prompt goes
     on stdin and stdout is the line-delimited JSON protocol v3.
-  * `:claude` — `claude -p --verbose --output-format stream-json [--model M]
+  * `:claude` runs `claude -p --verbose --output-format stream-json [--model M]
     [--system-prompt S] [--append-system-prompt S] [--resume SESSION]
-    [--dangerously-skip-permissions]`; prompt on stdin.
-  * `:opencode` — `opencode run <prompt>` (prompt as an argument).
-  * `:agy` — `agy -p <prompt>` (prompt as an argument).
+    [--dangerously-skip-permissions]`. The prompt goes on stdin.
+  * `:opencode` runs `opencode run <prompt>` with the prompt as an argument.
+  * `:agy` runs `agy -p <prompt>` with the prompt as an argument.
+
+  Options come from step opts first, then workflow config (`agent:` block).
 
   Options:
 
-  * `:provider` — one of the providers above; falls back to workflow config and
-    `SANAD_DEFAULT_AGENT_PROVIDER` (default `:pi`).
+  * `:provider` is one of the providers above. It falls back to workflow config,
+    then `SANAD_DEFAULT_AGENT_PROVIDER` (default `:pi`).
   * `:model`, `:system_prompt`, `:append_system_prompt` (pi/claude)
-  * `:command` — String or list overriding the base binary/argv prefix
-    (useful for wrappers such as `pi -ne`, or a stub in tests).
-  * `:session` — fork/resume a provider session (pi/claude).
-  * `:skip_permissions` — Claude only; adds `--dangerously-skip-permissions`.
-  * `:cwd` — defaults to `ctx.workflow_dir`.
+  * `:command` is a String or list overriding the base binary/argv prefix,
+    useful for wrappers such as `pi -ne` or a stub in tests.
+  * `:session` forks or resumes a provider session (pi/claude).
+  * `:fork_session` adds `--fork-session` for claude when a session is set
+    (default `true`).
+  * `:skip_permissions` is Claude only and adds `--dangerously-skip-permissions`.
+  * `:cwd` defaults to `ctx.workflow_dir`.
   * `:env`, `:timeout`
   """
 

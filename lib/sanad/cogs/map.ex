@@ -18,18 +18,18 @@ defmodule Sanad.Cogs.Map do
   item and whose `scope_index` is its position. The output is a
   `%Sanad.Output.MapResult{}`:
 
-  * `items` — each iteration's final output, in input order; `nil` for
+  * `items` holds each iteration's final output, in input order, with `nil` for
     iterations that never ran.
-  * `contexts` — matching child contexts (see `from/2`, `collect/2`, `reduce/3`).
+  * `contexts` holds the matching child contexts (see `from/2`, `collect/2`, `reduce/3`).
 
   Options:
 
-  * `:scope` — required.
-  * `:parallel` — `false` (default, serial), `true` (scheduler count),
+  * `:scope` is required.
+  * `:parallel` accepts `false` (default, serial), `true` (scheduler count),
     `0` (unlimited), or a positive integer limit.
-  * `:timeout` — per-iteration timeout in ms; defaults to `:infinity`.
+  * `:timeout` is the per-iteration timeout in ms and defaults to `:infinity`.
     A timed-out iteration aborts the map with a `RuntimeError`.
-  * `:initial_index` — offset added to `scope_index` (upstream semantics).
+  * `:initial_index` is an offset added to `scope_index` (upstream semantics).
 
   Iterations are monitored in completion order (upstream `Async::Barrier`
   semantics):

@@ -62,7 +62,7 @@ defmodule Sanad.MissingEnvError do
   def message(%{name: name, hint: nil}), do: "missing environment variable #{name}"
 
   def message(%{name: name, hint: hint}) do
-    "missing environment variable #{name} — #{hint}"
+    "missing environment variable #{name}. #{hint}"
   end
 end
 
@@ -100,7 +100,7 @@ defmodule Sanad.MissingExecutableError do
   def message(%{name: name, hint: nil}), do: "executable #{inspect(name)} not found on PATH"
 
   def message(%{name: name, hint: hint}) do
-    "executable #{inspect(name)} not found on PATH — #{hint}"
+    "executable #{inspect(name)} not found on PATH. #{hint}"
   end
 end
 

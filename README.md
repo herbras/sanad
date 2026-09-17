@@ -1,55 +1,55 @@
 # Sanad
 
-Rewrite Elixir dari [Shopify Roast](https://github.com/Shopify/roast) — DSL untuk *structured AI workflows*.
+Rewrite Elixir dari [Shopify Roast](https://github.com/Shopify/roast), DSL untuk structured AI workflows.
 
-Roast asli adalah gem Ruby: workflow ditulis deklaratif, lalu "cogs" (`chat`, `agent`, `cmd`, `map`, …) dijalankan berantai. Output satu step bisa dipakai step berikutnya. Sanad meniru model itu dengan **macro Elixir + Task** (bukan terjemahan 1:1 file Ruby).
+Roast asli adalah gem Ruby. Workflow ditulis deklaratif, lalu "cogs" (`chat`, `agent`, `cmd`, `map`, dan lainnya) dijalankan berantai. Output satu step bisa dipakai step berikutnya. Sanad meniru model itu dengan macro Elixir dan Task, bukan terjemahan baris per baris dari file Ruby.
 
-## Kenapa Elixir cocok
+## Kenapa Elixir
 
 | Roast (Ruby) | Sanad (Elixir) |
 |---|---|
 | `instance_eval` + proc | macro `use Sanad.DSL` |
-| `Async::Barrier` (gem `async`) | `Task.Supervisor` + message-based monitoring |
-| named cog output `chat!(:x)` | `chat!(ctx, :x)` (ctx eksplisit) |
-| `cmd` lewat Open3 | `Port` (stdout/stderr terpisah, timeout) |
+| `Async::Barrier` (gem `async`) | `Task.Supervisor` dengan pemantauan pesan |
+| named output `chat!(:x)` | `chat!(ctx, :x)`, ctx eksplisit |
+| `cmd` lewat Open3 | `Port`, stdout/stderr terpisah, ada timeout |
 | provider HTTP | `Req` |
-| scope nested (`call`/`map`/`repeat`) | child `Context` terisolasi + `from`/`collect`/`reduce` |
+| scope nested (`call`/`map`/`repeat`) | `Context` anak terisolasi + `from`/`collect`/`reduce` |
 
-BEAM sudah kuat untuk I/O paralel; itu bagian yang di Ruby harus dipasang gem async.
+BEAM sudah kuat untuk I/O paralel. Itu bagian yang di Ruby harus dipasang gem async.
 
 ## Status
 
-**MVP+ — siap dipakai untuk workflow nyata, dengan divergensi yang didokumentasikan.**
+MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow nyata.
 
 | Area | Status |
 |---|---|
-| DSL `config` / `execute` / `execute :scope` | ✅ |
-| Cogs: `chat`, `cmd`, `agent`, `elixir_cog` (`ruby`), `map_cog`, `call_cog`, `repeat_cog` | ✅ |
-| Control flow `skip!` / `fail!` / `next!` / `break!` + `abort_on_failure` | ✅ |
-| Nested engine (child context terisolasi, `from`/`collect`/`reduce`) | ✅ |
-| Chat: OpenAI, Anthropic, Gemini, Perplexity (+ base_url/api_key/key_env per workflow) | ✅ |
-| Agent: `pi`, `claude`, `opencode`, `agy` (prompt via stdin/argv, JSON protocol pi/claude) | ✅ |
-| Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | ✅ |
-| CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | ✅ |
-| Ringkasan run (status + durasi per cog) | ✅ |
-| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | ✅ 77 tes |
-| Event monitor setara Roast (render `🔥`, block events, dst.) | ⬜ belum |
-| Scope `outputs { }` / `outputs! { }` | ⬜ belum |
-| Config per-nama/regex (`chat(:x) do …`) | ⬜ belum |
-| Streaming, JSON mode/tools, session normalization penuh | ⬜ belum |
-| Tutorial 1–9, publish Hex | ⬜ ditunda |
+| DSL `config` / `execute` / `execute :scope` | Ya |
+| Cogs: `chat`, `cmd`, `agent`, `elixir_cog` (`ruby`), `map_cog`, `call_cog`, `repeat_cog` | Ya |
+| Control flow `skip!` / `fail!` / `next!` / `break!` + `abort_on_failure` | Ya |
+| Nested engine (child context terisolasi, `from`/`collect`/`reduce`) | Ya |
+| Chat: OpenAI, Anthropic, Gemini, Perplexity, plus base_url/api_key/key_env per workflow | Ya |
+| Agent: `pi`, `claude`, `opencode`, `agy` (prompt via stdin atau argv) | Ya |
+| Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | Ya |
+| CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | Ya |
+| Ringkasan run (status dan durasi per cog) | Ya |
+| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 77 tes |
+| Event monitor setara Roast | Belum |
+| Scope `outputs { }` / `outputs! { }` | Belum |
+| Config per-nama/regex (`chat(:x) do ... end`) | Belum |
+| Streaming, JSON mode/tools, session normalization penuh | Belum |
+| Tutorial 1-9, publish Hex | Ditunda |
 
 ## Install
 
 Butuh Elixir 1.16+ dan Mix.
 
 ```bash
-cd sanad
+cd roast_ex
 mix deps.get
 mix test
 ```
 
-## Quickstart (tanpa API key)
+## Quickstart tanpa API key
 
 ```bash
 mix sanad.execute examples/local_pipeline.exs
@@ -57,7 +57,7 @@ mix sanad.execute examples/local_pipeline.exs
 mix escript.build && ./sanad examples/local_pipeline.exs
 ```
 
-`examples/local_pipeline.exs` memakai `cmd` + `elixir_cog` + `call_cog` + `map_cog` (paralel) + `repeat_cog` — tidak butuh network.
+`examples/local_pipeline.exs` memakai `cmd`, `elixir_cog`, `call_cog`, `map_cog` (paralel), dan `repeat_cog`. Tidak butuh network.
 
 ## Workflow
 
@@ -99,9 +99,9 @@ Di dalam block input, `ctx` selalu ter-bind. Helper yang tersedia:
 
 | Helper | Keterangan |
 |---|---|
-| `cmd!/2`, `chat!/2`, `agent!/2`, `elixir!/2`, `output!/2` | baca output bernama (error jelas kalau belum jalan / skipped / failed) |
+| `cmd!/2`, `chat!/2`, `agent!/2`, `elixir!/2`, `output!/2` | baca output bernama, error jelas kalau belum jalan, skipped, atau failed |
 | `params/1` | map params dari CLI |
-| `status/2` | `:ok` / `:skipped` / `:failed` |
+| `status/2` | `:ok`, `:skipped`, atau `:failed` |
 | `skip!/1`, `fail!/1`, `next!/1`, `break!/1` | control flow |
 | `from/2`, `collect/1,2`, `reduce/3` | akses hasil scope nested |
 
@@ -109,8 +109,8 @@ Di dalam block input, `ctx` selalu ter-bind. Helper yang tersedia:
 
 ```elixir
 cmd(:name, "shell command")                       # :cwd, :env, :timeout, :fail_on_error
-cmd :name, fail_on_error: false do "…" end
-elixir_cog(:name, do: 1 + 1)                      # nilai mentah (padanan `ruby`)
+cmd :name, fail_on_error: false do "..." end
+elixir_cog(:name, do: 1 + 1)                      # nilai mentah, padanan `ruby`
 map_cog :name, scope: :one_item, parallel: 4 do [1, 2, 3] end
 call_cog :name, scope: :inner, index: 0 do some_value end
 repeat_cog :name, scope: :one_iteration, max_iterations: 10 do initial_value end
@@ -127,7 +127,7 @@ agent :name do "prompt" end
 | `:gemini` | `GEMINI_API_KEY` | `GEMINI_API_BASE` |
 | `:perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_API_BASE` |
 
-Default provider via `SANAD_DEFAULT_CHAT_PROVIDER`. Endpoint OpenAI-compatible (OpenRouter, Cloudflare Workers AI, dst.) bisa lewat config workflow:
+Default provider lewat `SANAD_DEFAULT_CHAT_PROVIDER`. Endpoint yang kompatibel dengan OpenAI, misalnya OpenRouter atau Cloudflare Workers AI, bisa dipakai lewat config workflow:
 
 ```elixir
 config do
@@ -137,18 +137,18 @@ config do
 end
 ```
 
-Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`; error HTTP/transport melempar `Sanad.ChatError` dengan status.
+Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
 
 ### Agent providers
 
 | provider | invocation | prompt | response |
 |---|---|---|---|
-| `:pi` (default) | `pi --mode json -p … (--fork SID \| --no-session)` | stdin | JSON protocol v3 (parse teks + session id) |
-| `:claude` | `claude -p --verbose --output-format stream-json …` | stdin | stream-json (`result`) |
+| `:pi` (default) | `pi --mode json -p ... (--fork SID \| --no-session)` | stdin | JSON protocol v3, teks dan session id |
+| `:claude` | `claude -p --verbose --output-format stream-json ...` | stdin | stream-json, field `result` |
 | `:opencode` | `opencode run <prompt>` | argv | teks |
 | `:agy` | `agy -p <prompt>` | argv | teks |
 
-Default provider via `SANAD_DEFAULT_AGENT_PROVIDER`. `cd` default = `workflow_dir`; binary hilang → `Sanad.MissingExecutableError`; opsi: `:model`, `:system_prompt`, `:append_system_prompt`, `:session`, `:skip_permissions`, `:command`, `:env`, `:timeout`.
+Default provider lewat `SANAD_DEFAULT_AGENT_PROVIDER`. `cd` default-nya `workflow_dir`. Binary yang tidak ketemu melempar `Sanad.MissingExecutableError`. Opsi: `:model`, `:system_prompt`, `:append_system_prompt`, `:session`, `:fork_session`, `:skip_permissions`, `:command`, `:env`, `:timeout`.
 
 ### Control flow
 
@@ -162,10 +162,10 @@ elixir_cog :checked do
 end
 ```
 
-- `skip!` — tanpa output, status `:skipped`, lanjut.
-- `fail!` — status `:failed`; abort bila `abort_on_failure` (step opts › config › default `true`). Error lain **selalu** abort.
-- `next!` — mengakhiri scope saat ini (diam-diam).
-- `break!` — mengakhiri scope + membatalkan sibling yang masih jalan di `map` (hasil yang sudah selesai dipertahankan, slot yang tidak jalan `nil`); di scope teratas menghentikan step selanjutnya.
+- `skip!` tidak menghasilkan output, statusnya `:skipped`, workflow lanjut.
+- `fail!` menandai `:failed` lalu abort bila `abort_on_failure` aktif (step opts lebih dulu, lalu config, default `true`). Error lain selalu abort.
+- `next!` mengakhiri scope saat ini tanpa pesan.
+- `break!` mengakhiri scope dan membatalkan sibling yang masih jalan di `map`. Hasil yang sudah selesai dipertahankan, slot yang tidak jalan berisi `nil`. Di scope teratas, step selanjutnya berhenti.
 
 ### Nested scopes
 
@@ -190,7 +190,7 @@ execute do
 end
 ```
 
-Setiap scope nested berjalan di `Context` anak yang terisolasi: output dalam tidak terlihat dari luar (dan sebaliknya); akses lewat `from/2`, `collect/1,2`, `reduce/3`. `scope_value`/`scope_index` meneruskan item/index; `map_cog` mendukung `parallel: false | true | 0 | n`, `:timeout`, `:initial_index`; `repeat_cog` meneruskan output akhir iterasi ke iterasi berikutnya (guard default 1000 iterasi; `nil`/`:infinity` mematikan guard).
+Setiap scope nested jalan di `Context` anak yang terisolasi. Output di dalam tidak terlihat dari luar, dan sebaliknya. Aksesnya lewat `from/2`, `collect/1,2`, dan `reduce/3`. `scope_value` dan `scope_index` meneruskan item dan index. `map_cog` mendukung `parallel: false | true | 0 | n`, `:timeout`, dan `:initial_index`. `repeat_cog` meneruskan output akhir iterasi ke iterasi berikutnya, dengan guard default 1000 iterasi. Isi `nil` atau `:infinity` untuk mematikan guard.
 
 ## CLI
 
@@ -201,7 +201,7 @@ cp sanad ~/.local/bin/sanad     # taruh di PATH, pakai dari project mana pun
 sanad path/to/workflow.exs --param key=value
 ```
 
-Output berisi ringkasan (status + durasi per cog) lalu inspect output lengkap. Workflow gagal → exit code non-zero dengan pesan error.
+Output berisi ringkasan (status dan durasi per cog) lalu inspect output lengkap. Workflow gagal menghasilkan exit code non-zero beserta pesan errornya.
 
 ## Testing
 
@@ -211,22 +211,22 @@ mix test
 
 Semua tes offline:
 
-- DSL/runner/control flow/nested engine: unit + integrasi tanpa network.
-- Chat: `Req.Test` (plug test-only) untuk 4 provider, error HTTP/transport, config override.
-- Agent: stub executable `pi`/`claude`/`opencode`/`agy`.
+- DSL, runner, control flow, nested engine: unit dan integrasi tanpa network.
+- Chat: `Req.Test` (plug test-only) untuk 4 provider, error HTTP/transport, dan override config.
+- Agent: stub executable `pi`, `claude`, `opencode`, `agy`.
 - E2E: subprocess `mix sanad.execute` untuk pipeline penuh, scope, params, control flow, dan jalur gagal.
 
 ## Divergensi yang didokumentasikan
 
-- `ruby` → `elixir_cog` (nilai mentah; tidak ada evaluasi string Ruby).
-- Agent satu prompt per step (upstream bisa multi-prompt & merantai sesi); `:fork_session` claude tersedia sebagai opsi (default `true` saat `:session` diisi).
-- Chat menambah `system_prompt`, `max_tokens`, `temperature`, retry/timeout, `PERPLEXITY_API_BASE`, dan override `base_url`/`api_key`/`key_env` (upstream lebih minim).
-- Belum ada `outputs { }` / `outputs! { }` untuk nilai balik scope (default: output cog terakhir).
-- Belum ada config per-nama/regex ala Roast (`chat(:x) do … end`); pakai opsi step.
-- Event rendering Roast (`🔥`, `❯`, block events) belum direplikasi; Sanad punya ringkasan run.
-- `MaxTokensExceededError` heuristik upstream tidak direplikasi.
-- `cmd :timeout` adalah tambahan Sanad (upstream tidak punya).
+- `ruby` diganti `elixir_cog` yang mengembalikan nilai mentah. Tidak ada evaluasi string Ruby.
+- Agent satu prompt per step. Upstream bisa multi-prompt dan merantai sesi. Opsi `:fork_session` untuk claude tersedia, default `true` saat `:session` diisi.
+- Chat menambah `system_prompt`, `max_tokens`, `temperature`, retry, timeout, `PERPLEXITY_API_BASE`, dan override `base_url`/`api_key`/`key_env`. Upstream lebih minim.
+- `outputs { }` dan `outputs! { }` untuk nilai balik scope belum ada. Default-nya output cog terakhir.
+- Config per-nama atau regex ala Roast (`chat(:x) do ... end`) belum ada. Pakai opsi step.
+- Event rendering Roast (glyph dan block events) belum direplikasi. Sanad punya ringkasan run.
+- Heuristik `MaxTokensExceededError` dari upstream tidak direplikasi.
+- `cmd :timeout` adalah tambahan Sanad, upstream tidak punya.
 
 ## Lisensi
 
-MIT. Port ini juga MIT; API dan ide workflow milik upstream (Shopify/roast).
+MIT. Port ini juga MIT. API dan ide workflow milik upstream, Shopify/roast.

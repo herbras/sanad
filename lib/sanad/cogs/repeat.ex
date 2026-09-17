@@ -24,9 +24,9 @@ defmodule Sanad.Cogs.Repeat do
 
   Options:
 
-  * `:scope` — required.
-  * `:max_iterations` — loop guard; defaults to `1000`. `nil` or `:infinity`
-    disables the guard (upstream Roast has no guard at all).
+  * `:scope` is required.
+  * `:max_iterations` is the loop guard and defaults to `1000`. `nil` or
+    `:infinity` disables the guard (upstream Roast has no guard at all).
   """
 
   alias Sanad.Runner

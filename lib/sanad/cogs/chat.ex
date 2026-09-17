@@ -24,14 +24,14 @@ defmodule Sanad.Cogs.Chat do
 
   ## Options
 
-  * `:provider` — defaults to `SANAD_DEFAULT_CHAT_PROVIDER` or `:openai`
+  * `:provider` defaults to `SANAD_DEFAULT_CHAT_PROVIDER` or `:openai`.
   * `:model`
   * `:system_prompt`, `:temperature`, `:max_tokens`
   * `:api_key` (literal), `:key_env` (env var name), `:base_url`
-  * `:timeout` — request receive timeout in ms (default `60_000`)
-  * `:max_retries` — default 3 (POST requests are retried with
-    `retry: :transient`)
-  * `:req_options` — extra `Req` options, e.g. `plug: {Req.Test, Name}` in tests
+  * `:timeout` is the request receive timeout in ms (default `60_000`).
+  * `:max_retries` defaults to 3. POST requests are retried with
+    `retry: :transient`.
+  * `:req_options` passes extra `Req` options, e.g. `plug: {Req.Test, Name}` in tests.
 
   Failures raise `Sanad.ChatError`; missing keys raise
   `Sanad.MissingEnvError`; invalid providers `Sanad.InvalidConfigError`.

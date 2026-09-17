@@ -10,6 +10,7 @@ defmodule Sanad.CLI do
   """
 
   def main(args) do
+    load_env_file()
     {:ok, _} = Application.ensure_all_started(:req)
 
     {opts, rest, invalid} =
@@ -31,6 +32,23 @@ defmodule Sanad.CLI do
       true ->
         execute(hd(rest), opts)
     end
+  end
+
+  # BYOK convenience: auto-load ~/.config/sanad/.env (KEY=VALUE lines)
+  # unless SANAD_ENV_FILE points elsewhere. Existing env wins.
+  defp load_env_file do
+    path = System.get_env("SANAD_ENV_FILE") || Path.expand("~/.config/sanad/.env")
+
+    with true <- File.exists?(path),
+         {:ok, content} <- File.read(path) do
+      for line <- String.split(content, "\n", trim: true),
+          [k, v] <- String.split(line, "=", parts: 2),
+          k != "" and System.get_env(k) == nil do
+        System.put_env(k, String.trim(v) |> String.trim("\"") |> String.trim("'"))
+      end
+    end
+
+    :ok
   end
 
   defp execute(path, opts) do
@@ -72,7 +90,7 @@ defmodule Sanad.CLI do
 
   defp print_usage do
     IO.puts("""
-    sanad — run a Sanad workflow from anywhere.
+    Run a Sanad workflow from anywhere.
 
     Usage:
       sanad path/to/workflow.exs [--module ModuleName] [--param key=value ...]

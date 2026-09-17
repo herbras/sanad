@@ -5,11 +5,11 @@ defmodule Sanad.ControlFlow do
   They are implemented with `throw/1` and caught by the runner at the step
   boundary:
 
-  * `skip!`   — the cog produces no output and is marked `:skipped`; the workflow continues.
-  * `fail!`   — the cog is marked `:failed`; the workflow aborts when
+  * `skip!` produces no output and marks the cog `:skipped`; the workflow continues.
+  * `fail!` marks the cog `:failed`; the workflow aborts when
     `abort_on_failure` is true (the default), otherwise it continues.
-  * `next!`   — ends the current scope quietly (remaining steps are not run).
-  * `break!`  — ends the current scope and propagates to the enclosing loop/scope.
+  * `next!` ends the current scope quietly (remaining steps are not run).
+  * `break!` ends the current scope and propagates to the enclosing loop/scope.
 
   Messages are accepted for API compatibility with Roast, which discards them;
   here they are attached to `fail!` aborts and ignored otherwise.

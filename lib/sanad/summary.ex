@@ -18,7 +18,7 @@ defmodule Sanad.Summary do
       end)
 
     header =
-      "Sanad workflow finished in #{elapsed_ms}ms — #{ok} ok, #{skipped} skipped, #{failed} failed"
+      "Sanad workflow finished in #{elapsed_ms}ms: #{ok} ok, #{skipped} skipped, #{failed} failed"
 
     lines =
       ctx.statuses

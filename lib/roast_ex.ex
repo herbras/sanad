@@ -13,10 +13,10 @@ defmodule Sanad do
 
   Options:
 
-  * `:module` — module defined in the file (default: inferred from the file
-    name, e.g. `my_workflow.exs` → `MyWorkflow`)
-  * `:params` — workflow params map (see `Sanad.Helpers.params/1`)
-  * `:workflow_dir` — defaults to the file's directory
+  * `:module` is the module defined in the file. Default: inferred from the file
+    name, e.g. `my_workflow.exs` becomes `MyWorkflow`.
+  * `:params` is the workflow params map (see `Sanad.Helpers.params/1`).
+  * `:workflow_dir` defaults to the file's directory.
   """
   @spec run_file(Path.t(), keyword()) :: Sanad.Context.t()
   def run_file(path, opts \\ []) do

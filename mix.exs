@@ -8,6 +8,7 @@ defmodule RoastEx.MixProject do
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      escript: escript(),
       description: "Elixir rewrite of Shopify Roast — structured AI workflows"
     ]
   end
@@ -19,10 +20,15 @@ defmodule RoastEx.MixProject do
     ]
   end
 
+  defp escript do
+    [main_module: RoastEx.CLI, name: "roast"]
+  end
+
   defp deps do
     [
       {:jason, "~> 1.4"},
-      {:req, "~> 0.5"}
+      {:req, "~> 0.5"},
+      {:plug, "~> 1.16", only: :test}
     ]
   end
 end

@@ -39,6 +39,19 @@ cd roast_ex
 mix deps.get
 ```
 
+### CLI global (pakai di project mana pun)
+
+Build sekali, taruh binary di PATH — tidak butuh source tree lagi:
+
+```bash
+mix escript.build
+cp roast ~/.local/bin/roast   # atau /usr/local/bin
+roast path/to/workflow.exs --module MyWorkflow
+```
+
+`--module` bisa diabaikan kalau nama file sudah mengarah ke modul
+(`hello_wf.exs` → `HelloWf`).
+
 Env yang sama dengan Roast:
 
 ```bash

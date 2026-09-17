@@ -56,12 +56,12 @@ Gate: acceptance §4.C + §4.D hijau. **PASSED** — 68 tests; chat diuji via `R
 
 ## Slice D — product polish
 
-- [ ] D1 CLI: `--module` hardened, `--param key=value`, pesan error jelas.
-- [ ] D2 Event log ringkas: `begin/end` tiap cog + scope, summary akhir (durasi, status), ganti `inspect` mentah.
-- [ ] D3 Port 2–3 contoh upstream ke `examples/` + fixture test.
-- [ ] D4 Update README status table + dokumentasi API final.
+- [x] D1 CLI: `--module` hardened (non-alnum file names), `--param key=value`, pesan error jelas; dipakai oleh `mix roast.execute` + escript `roast`.
+- [x] D2 Ringkasan run: status + durasi per cog (`RoastEx.Summary`), menggantikan inspect mentah sebagai header (inspect tetap dicetak). Penuh EventMonitor belum.
+- [x] D3 Port 2 contoh upstream: `examples/control_flow.exs` (tutorial 05) dan `examples/reusable_scopes.exs` (tutorial 06) + E2E.
+- [x] D4 Update README status table + API final + divergensi.
 
-Gate: acceptance §4.E hijau + README jujur.
+Gate: acceptance §4.E hijau (file loading + `--param`). **PASSED** — 72 tests termasuk E2E CLI jalur sukses & gagal.
 
 ## Process
 

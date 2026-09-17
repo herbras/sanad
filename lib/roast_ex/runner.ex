@@ -102,6 +102,7 @@ defmodule RoastEx.Runner do
 
   defp execute_step(%{type: type, name: name, opts: opts, fun: fun}, ctx) do
     opts = normalize_opts(opts)
+    started = System.monotonic_time(:millisecond)
 
     result =
       try do
@@ -112,7 +113,12 @@ defmodule RoastEx.Runner do
         {:roast_control, kind, message} -> {:control, kind, message}
       end
 
-    handle_result(result, name, opts, ctx)
+    elapsed = System.monotonic_time(:millisecond) - started
+
+    case handle_result(result, name, opts, ctx) do
+      {:cont, ctx} -> {:cont, Context.put_timing(ctx, name, elapsed)}
+      {:halt, ctx, control} -> {:halt, Context.put_timing(ctx, name, elapsed), control}
+    end
   end
 
   defp handle_result({:ok, output}, name, _opts, ctx) do

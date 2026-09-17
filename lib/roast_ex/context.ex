@@ -11,6 +11,7 @@ defmodule RoastEx.Context do
   defstruct outputs: %{},
             statuses: %{},
             failures: %{},
+            timings: %{},
             config: %{},
             params: %{},
             workflow_dir: ".",
@@ -24,6 +25,7 @@ defmodule RoastEx.Context do
           outputs: map(),
           statuses: map(),
           failures: map(),
+          timings: map(),
           config: map(),
           params: map(),
           workflow_dir: String.t(),
@@ -54,9 +56,15 @@ defmodule RoastEx.Context do
     %{ctx | failures: Map.put(ctx.failures, name, reason)}
   end
 
-  @doc "Returns the `fail!` reason for a name, if any."
+  @doc "Records the `fail!` reason for a name, if any."
   @spec failure_reason(t(), atom()) :: term()
   def failure_reason(%__MODULE__{} = ctx, name), do: Map.get(ctx.failures, name)
+
+  @doc "Records a step's wall-clock duration in milliseconds."
+  @spec put_timing(t(), atom(), non_neg_integer()) :: t()
+  def put_timing(%__MODULE__{} = ctx, name, ms) do
+    %{ctx | timings: Map.put(ctx.timings, name, ms)}
+  end
 
   @doc "Returns the status of a named output, or nil when it was never touched."
   @spec status(t(), atom()) :: status() | nil

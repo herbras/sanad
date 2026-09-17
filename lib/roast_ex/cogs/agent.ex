@@ -1,0 +1,34 @@
+defmodule RoastEx.Cogs.Agent do
+  @moduledoc """
+  Local coding-agent cog. Shells out to `pi` or `claude` CLI, matching Roast.
+  """
+
+  alias RoastEx.Output.Agent
+
+  def run(prompt, opts, config) when is_binary(prompt) do
+    agent_cfg = Map.get(config, :agent, %{})
+    provider = Keyword.get(opts, :provider) || Map.get(agent_cfg, :provider, default_provider())
+
+    {bin, args} =
+      case provider do
+        :claude -> {"claude", ["-p", prompt]}
+        :pi -> {"pi", [prompt]}
+        other -> raise "Unsupported agent provider: #{inspect(other)}"
+      end
+
+    {stdout, status} = System.cmd(bin, args, stderr_to_stdout: true)
+
+    if status != 0 do
+      raise "agent #{provider} exited #{status}: #{stdout}"
+    end
+
+    %Agent{response: stdout, provider: provider, raw: %{status: status}}
+  end
+
+  defp default_provider do
+    case System.get_env("ROAST_DEFAULT_AGENT_PROVIDER") do
+      "claude" -> :claude
+      _ -> :pi
+    end
+  end
+end

@@ -1,0 +1,18 @@
+# Build artifacts
+/_build/
+/cover/
+/deps/
+/doc/
+/.fetch
+
+# Misc
+erl_crash.dump
+*.ez
+*.beam
+/config/*.secret.exs
+.elixir_ls/
+.fetch
+
+# Tooling caches
+.firecrawl/
+.agent-context/

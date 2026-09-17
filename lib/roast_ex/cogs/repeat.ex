@@ -25,8 +25,8 @@ defmodule RoastEx.Cogs.Repeat do
   Options:
 
   * `:scope` — required.
-  * `:max_iterations` — loop guard; defaults to `1000`. Use `:infinity` to
-    disable (upstream Roast has no guard at all).
+  * `:max_iterations` — loop guard; defaults to `1000`. `nil` or `:infinity`
+    disables the guard (upstream Roast has no guard at all).
   """
 
   alias RoastEx.Runner
@@ -37,8 +37,22 @@ defmodule RoastEx.Cogs.Repeat do
 
   def run(value, opts, ctx) do
     scope = Nested.scope!(:repeat, opts)
-    max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
-    validate_max_iterations!(max_iterations)
+
+    max_iterations =
+      case Keyword.get(opts, :max_iterations, @default_max_iterations) do
+        nil ->
+          :infinity
+
+        :infinity ->
+          :infinity
+
+        max when is_integer(max) and max > 0 ->
+          max
+
+        other ->
+          raise ArgumentError,
+                "repeat :max_iterations must be a positive integer, nil, or :infinity, got: #{inspect(other)}"
+      end
 
     results =
       Enum.reverse(loop(ctx, scope, value, 0, max_iterations, []))
@@ -53,9 +67,16 @@ defmodule RoastEx.Cogs.Repeat do
     }
   end
 
-  @doc "Returns all iteration outputs."
+  @doc "Returns all iteration outputs (mapping `fun` over each run iteration)."
   def collect(%Repeat{results: results}), do: results
-  def collect(%Repeat{results: results}, fun) when is_function(fun, 1), do: Enum.map(results, fun)
+
+  def collect(%Repeat{results: results, contexts: contexts}, fun) when is_function(fun, 1) do
+    Enum.zip(contexts, results)
+    |> Enum.map(fn
+      {nil, _result} -> nil
+      {_child_ctx, result} -> fun.(result)
+    end)
+  end
 
   @doc "Runs `fun` with each iteration's child context (`nil` stays `nil`)."
   def from(%Repeat{contexts: contexts}, fun) when is_function(fun, 1) do
@@ -65,11 +86,16 @@ defmodule RoastEx.Cogs.Repeat do
     end)
   end
 
-  @doc "Reduces over non-nil iteration outputs."
-  def reduce(%Repeat{results: results}, acc, fun) when is_function(fun, 2) do
-    results
-    |> Enum.reject(&is_nil/1)
-    |> Enum.reduce(acc, fun)
+  @doc """
+  Reduces over iterations with an accumulator-first callback (`fun.(acc, item)`).
+  A `nil` return keeps the previous accumulator (upstream semantics).
+  """
+  def reduce(%Repeat{results: results, contexts: contexts}, acc, fun) when is_function(fun, 2) do
+    Enum.zip(contexts, results)
+    |> Enum.reduce(acc, fn
+      {nil, _result}, acc -> acc
+      {_child_ctx, result}, acc -> reduce_step(fun, acc, result)
+    end)
   end
 
   @doc "Returns the output of a specific iteration."
@@ -90,13 +116,11 @@ defmodule RoastEx.Cogs.Repeat do
     end
   end
 
-  defp validate_max_iterations!(:infinity), do: :ok
-
-  defp validate_max_iterations!(max) when is_integer(max) and max > 0, do: :ok
-
-  defp validate_max_iterations!(other) do
-    raise ArgumentError,
-          "repeat :max_iterations must be a positive integer or :infinity, got: #{inspect(other)}"
+  defp reduce_step(fun, acc, item) do
+    case fun.(acc, item) do
+      nil -> acc
+      new_acc -> new_acc
+    end
   end
 
   defp unzip_pairs([]), do: {[], []}

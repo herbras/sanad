@@ -38,8 +38,6 @@ defmodule RoastEx.Cogs.Call do
   Runs `fun` with the child context of a call output, giving access to the
   scope's inner outputs.
   """
-  def from(%Output.Call{context: nil}, _fun), do: nil
-
   def from(%Output.Call{context: child_ctx}, fun) when is_function(fun, 1) do
     fun.(child_ctx)
   end

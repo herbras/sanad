@@ -49,6 +49,7 @@ defmodule RoastEx.DSL do
       import RoastEx.Helpers
 
       Module.register_attribute(__MODULE__, :roast_steps, accumulate: true)
+      Module.register_attribute(__MODULE__, :roast_declared_scopes, accumulate: true)
       Module.register_attribute(__MODULE__, :roast_config, accumulate: false)
       Module.register_attribute(__MODULE__, :roast_step_counter, accumulate: false)
       Module.register_attribute(__MODULE__, :roast_scope, accumulate: false)
@@ -79,11 +80,14 @@ defmodule RoastEx.DSL do
 
   @doc "Declares a named execution scope, callable with `call(:name, value)`."
   defmacro execute(name, do: block) when is_atom(name) do
-    # The attribute must be written at expansion time: nested cog macros expand
-    # before any expression emitted in the returned quote would be evaluated.
+    # `@roast_scope` must be written at expansion time: nested cog macros read it
+    # while expanding (before any emitted module-body expression is evaluated).
     Module.put_attribute(__CALLER__.module, :roast_scope, name)
 
     quote do
+      # `@roast_declared_scopes` must be written as a module-body expression so
+      # it persists for __before_compile__/function-body reads.
+      @roast_declared_scopes unquote(name)
       unquote(block)
       RoastEx.DSL.__reset_scope__()
     end
@@ -205,20 +209,47 @@ defmodule RoastEx.DSL do
   defp binds_ctx?(tuple) when is_tuple(tuple), do: tuple |> Tuple.to_list() |> binds_ctx?()
   defp binds_ctx?(_other), do: false
 
-  defmacro __before_compile__(_env) do
+  defmacro __before_compile__(env) do
+    steps = Module.get_attribute(env.module, :roast_steps) || []
+
+    steps
+    |> Enum.reverse()
+    |> Enum.group_by(fn {scope, _step} -> scope end, fn {_scope, step} -> step.name end)
+    |> Enum.each(fn {scope, names} -> validate_unique_names!(env, scope, names) end)
+
     quote do
       @doc false
       def __roast_config__, do: @roast_config
 
       @doc false
       def __roast_scopes__ do
-        @roast_steps
-        |> Enum.reverse()
-        |> Enum.group_by(fn {scope, _step} -> scope end, fn {_scope, step} -> step end)
+        scopes =
+          @roast_steps
+          |> Enum.reverse()
+          |> Enum.group_by(fn {scope, _step} -> scope end, fn {_scope, step} -> step end)
+
+        Enum.reduce(@roast_declared_scopes, scopes, fn name, acc ->
+          Map.put_new(acc, name, [])
+        end)
       end
 
       @doc false
       def __roast_steps__, do: Map.get(__roast_scopes__(), nil, [])
+    end
+  end
+
+  defp validate_unique_names!(env, scope, names) do
+    case names -- Enum.uniq(names) do
+      [] ->
+        :ok
+
+      duplicates ->
+        raise CompileError,
+          file: env.file,
+          line: env.line,
+          description:
+            "duplicate cog name(s) #{inspect(Enum.uniq(duplicates))} in scope #{inspect(scope)} " <>
+              "of #{inspect(env.module)}; cog names must be unique per scope"
     end
   end
 end

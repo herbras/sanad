@@ -1,11 +1,11 @@
-defmodule RoastEx.CLI do
+defmodule Sanad.CLI do
   @moduledoc """
   Escript entry point. Build with `mix escript.build` and drop the resulting
-  `roast` binary anywhere on your PATH to run workflows from any project:
+  `sanad` binary anywhere on your PATH to run workflows from any project:
 
-      roast path/to/workflow.exs --module MyWorkflow --param name=world
+      sanad path/to/workflow.exs --module MyWorkflow --param name=world
 
-  Same as `mix roast.execute`, but without needing the source tree or a Mix
+  Same as `mix sanad.execute`, but without needing the source tree or a Mix
   project around you.
   """
 
@@ -25,23 +25,23 @@ defmodule RoastEx.CLI do
 
   defp execute(path, opts) do
     unless File.exists?(path) do
-      IO.puts(:stderr, "roast: file not found: #{path}")
+      IO.puts(:stderr, "sanad: file not found: #{path}")
       System.halt(1)
     end
 
     started = System.monotonic_time(:millisecond)
 
     ctx =
-      RoastEx.run_file(path,
+      Sanad.run_file(path,
         module: opts[:module],
-        params: RoastEx.Summary.parse_params(Keyword.get_values(opts, :param))
+        params: Sanad.Summary.parse_params(Keyword.get_values(opts, :param))
       )
 
-    IO.puts(RoastEx.Summary.render(ctx, System.monotonic_time(:millisecond) - started))
+    IO.puts(Sanad.Summary.render(ctx, System.monotonic_time(:millisecond) - started))
     IO.puts(inspect(ctx.outputs, pretty: true, limit: :infinity))
   rescue
     e ->
-      IO.puts(:stderr, "roast: " <> Exception.message(e))
+      IO.puts(:stderr, "sanad: " <> Exception.message(e))
       System.halt(1)
   end
 
@@ -51,7 +51,7 @@ defmodule RoastEx.CLI do
   end
 
   defp usage_error(message) do
-    IO.puts(:stderr, "roast: " <> message)
+    IO.puts(:stderr, "sanad: " <> message)
     print_usage()
     System.halt(1)
   end
@@ -62,10 +62,10 @@ defmodule RoastEx.CLI do
 
   defp print_usage do
     IO.puts("""
-    roast — run a RoastEx workflow from anywhere.
+    sanad — run a Sanad workflow from anywhere.
 
     Usage:
-      roast path/to/workflow.exs [--module ModuleName] [--param key=value ...]
+      sanad path/to/workflow.exs [--module ModuleName] [--param key=value ...]
 
     Options:
       --module   module defined in the file (default: inferred from filename)
@@ -74,7 +74,7 @@ defmodule RoastEx.CLI do
 
     Env:
       OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY / PERPLEXITY_API_KEY
-      (+ *_API_BASE), ROAST_DEFAULT_CHAT_PROVIDER, ROAST_DEFAULT_AGENT_PROVIDER
+      (+ *_API_BASE), SANAD_DEFAULT_CHAT_PROVIDER, SANAD_DEFAULT_AGENT_PROVIDER
     """)
   end
 end

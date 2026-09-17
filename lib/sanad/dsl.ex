@@ -1,12 +1,12 @@
-defmodule RoastEx.DSL do
+defmodule Sanad.DSL do
   @moduledoc """
-  Macro DSL for defining RoastEx workflows.
+  Macro DSL for defining Sanad workflows.
 
   A workflow is a regular Elixir module that `use`s this module and declares a
   `config` block plus one or more `execute` blocks containing cogs:
 
       defmodule MyWorkflow do
-        use RoastEx.DSL
+        use Sanad.DSL
 
         config do
           %{
@@ -38,27 +38,27 @@ defmodule RoastEx.DSL do
   keyword list *without* `:do` is treated as the value (not as options).
 
   Steps are compiled into one generated function per step plus a manifest
-  (`__roast_steps__/0`, `__roast_scopes__/0`, `__roast_config__/0`); the runner
+  (`__sanad_steps__/0`, `__sanad_scopes__/0`, `__sanad_config__/0`); the runner
   never evaluates quoted source at runtime.
   """
 
   @doc false
   defmacro __using__(_opts) do
     quote do
-      import RoastEx.DSL
-      import RoastEx.Helpers
+      import Sanad.DSL
+      import Sanad.Helpers
 
-      Module.register_attribute(__MODULE__, :roast_steps, accumulate: true)
-      Module.register_attribute(__MODULE__, :roast_declared_scopes, accumulate: true)
-      Module.register_attribute(__MODULE__, :roast_config, accumulate: false)
-      Module.register_attribute(__MODULE__, :roast_step_counter, accumulate: false)
-      Module.register_attribute(__MODULE__, :roast_scope, accumulate: false)
+      Module.register_attribute(__MODULE__, :sanad_steps, accumulate: true)
+      Module.register_attribute(__MODULE__, :sanad_declared_scopes, accumulate: true)
+      Module.register_attribute(__MODULE__, :sanad_config, accumulate: false)
+      Module.register_attribute(__MODULE__, :sanad_step_counter, accumulate: false)
+      Module.register_attribute(__MODULE__, :sanad_scope, accumulate: false)
 
-      @roast_config %{}
-      @roast_step_counter 0
+      @sanad_config %{}
+      @sanad_step_counter 0
       @roast_scope nil
 
-      @before_compile RoastEx.DSL
+      @before_compile Sanad.DSL
     end
   end
 
@@ -68,13 +68,13 @@ defmodule RoastEx.DSL do
   """
   defmacro config(do: block) do
     quote do
-      @roast_config RoastEx.Config.normalize(unquote(block))
+      @sanad_config Sanad.Config.normalize(unquote(block))
     end
   end
 
   @doc "Declares the default (unnamed) execution scope."
   defmacro execute(do: block) do
-    Module.put_attribute(__CALLER__.module, :roast_scope, nil)
+    Module.put_attribute(__CALLER__.module, :sanad_scope, nil)
     block
   end
 
@@ -82,14 +82,14 @@ defmodule RoastEx.DSL do
   defmacro execute(name, do: block) when is_atom(name) do
     # `@roast_scope` must be written at expansion time: nested cog macros read it
     # while expanding (before any emitted module-body expression is evaluated).
-    Module.put_attribute(__CALLER__.module, :roast_scope, name)
+    Module.put_attribute(__CALLER__.module, :sanad_scope, name)
 
     quote do
-      # `@roast_declared_scopes` must be written as a module-body expression so
+      # `@sanad_declared_scopes` must be written as a module-body expression so
       # it persists for __before_compile__/function-body reads.
-      @roast_declared_scopes unquote(name)
+      @sanad_declared_scopes unquote(name)
       unquote(block)
-      RoastEx.DSL.__reset_scope__()
+      Sanad.DSL.__reset_scope__()
     end
   end
 
@@ -100,7 +100,7 @@ defmodule RoastEx.DSL do
 
   @doc false
   defmacro __reset_scope__ do
-    Module.put_attribute(__CALLER__.module, :roast_scope, nil)
+    Module.put_attribute(__CALLER__.module, :sanad_scope, nil)
     quote(do: :ok)
   end
 
@@ -144,10 +144,10 @@ defmodule RoastEx.DSL do
   defp split_do(arg), do: {:value, arg}
 
   defp add_step(caller, type, name, opts, block) do
-    counter = Module.get_attribute(caller.module, :roast_step_counter) || 0
-    Module.put_attribute(caller.module, :roast_step_counter, counter + 1)
-    fun_name = :"__roast_step_#{counter}__"
-    scope = Module.get_attribute(caller.module, :roast_scope)
+    counter = Module.get_attribute(caller.module, :sanad_step_counter) || 0
+    Module.put_attribute(caller.module, :sanad_step_counter, counter + 1)
+    fun_name = :"__sanad_step_#{counter}__"
+    scope = Module.get_attribute(caller.module, :sanad_scope)
 
     fun_def =
       if ctx_used?(block) do
@@ -170,7 +170,7 @@ defmodule RoastEx.DSL do
     quote do
       unquote(fun_def)
 
-      @roast_steps {unquote(scope),
+      @sanad_steps {unquote(scope),
                     %{
                       type: unquote(type),
                       name: unquote(name),
@@ -210,7 +210,7 @@ defmodule RoastEx.DSL do
   defp binds_ctx?(_other), do: false
 
   defmacro __before_compile__(env) do
-    steps = Module.get_attribute(env.module, :roast_steps) || []
+    steps = Module.get_attribute(env.module, :sanad_steps) || []
 
     steps
     |> Enum.reverse()
@@ -219,22 +219,22 @@ defmodule RoastEx.DSL do
 
     quote do
       @doc false
-      def __roast_config__, do: @roast_config
+      def __sanad_config__, do: @sanad_config
 
       @doc false
-      def __roast_scopes__ do
+      def __sanad_scopes__ do
         scopes =
-          @roast_steps
+          @sanad_steps
           |> Enum.reverse()
           |> Enum.group_by(fn {scope, _step} -> scope end, fn {_scope, step} -> step end)
 
-        Enum.reduce(@roast_declared_scopes, scopes, fn name, acc ->
+        Enum.reduce(@sanad_declared_scopes, scopes, fn name, acc ->
           Map.put_new(acc, name, [])
         end)
       end
 
       @doc false
-      def __roast_steps__, do: Map.get(__roast_scopes__(), nil, [])
+      def __sanad_steps__, do: Map.get(__sanad_scopes__(), nil, [])
     end
   end
 

@@ -1,7 +1,7 @@
-defmodule RoastEx.Cogs.AgentTest do
+defmodule Sanad.Cogs.AgentTest do
   use ExUnit.Case, async: false
 
-  alias RoastEx.Context
+  alias Sanad.Context
 
   setup do
     dir = Path.join(System.tmp_dir!(), "roast_agent_test_#{System.unique_integer([:positive])}")
@@ -33,7 +33,7 @@ defmodule RoastEx.Cogs.AgentTest do
     pwd_out = Path.join(dir, "pwd.txt")
 
     out =
-      RoastEx.Cogs.Agent.run(
+      Sanad.Cogs.Agent.run(
         "hello pi",
         [command: [stub_path], env: %{"CAPTURE" => capture, "PWD_OUT" => pwd_out}],
         ctx(dir)
@@ -55,7 +55,7 @@ defmodule RoastEx.Cogs.AgentTest do
       printf '%s\\n' '{"type":"result","subtype":"success","is_error":false,"result":"CLAUDE OK"}'
       """)
 
-    out = RoastEx.Cogs.Agent.run("hi", [provider: :claude, command: [stub_path]], ctx(dir))
+    out = Sanad.Cogs.Agent.run("hi", [provider: :claude, command: [stub_path]], ctx(dir))
 
     assert out.response == "CLAUDE OK"
     assert out.provider == :claude
@@ -71,7 +71,7 @@ defmodule RoastEx.Cogs.AgentTest do
     capture = Path.join(dir, "argv.txt")
 
     out =
-      RoastEx.Cogs.Agent.run(
+      Sanad.Cogs.Agent.run(
         "hello opencode",
         [provider: :opencode, command: [stub_path], env: %{"CAPTURE" => capture}],
         ctx(dir)
@@ -91,7 +91,7 @@ defmodule RoastEx.Cogs.AgentTest do
     capture = Path.join(dir, "argv.txt")
 
     out =
-      RoastEx.Cogs.Agent.run(
+      Sanad.Cogs.Agent.run(
         "hello agy",
         [provider: :agy, command: [stub_path], env: %{"CAPTURE" => capture}],
         ctx(dir)
@@ -108,22 +108,22 @@ defmodule RoastEx.Cogs.AgentTest do
       exit 3
       """)
 
-    assert_raise RoastEx.AgentError, ~r/status 3.*boom stderr/s, fn ->
-      RoastEx.Cogs.Agent.run("hi", [command: [stub_path]], ctx(dir))
+    assert_raise Sanad.AgentError, ~r/status 3.*boom stderr/s, fn ->
+      Sanad.Cogs.Agent.run("hi", [command: [stub_path]], ctx(dir))
     end
   end
 
   test "missing binary raises a clear error" do
-    assert_raise RoastEx.MissingExecutableError, ~r/not found on PATH/, fn ->
-      RoastEx.Cogs.Agent.run("hi", [command: ["definitely-not-real-xyz"]], %Context{})
+    assert_raise Sanad.MissingExecutableError, ~r/not found on PATH/, fn ->
+      Sanad.Cogs.Agent.run("hi", [command: ["definitely-not-real-xyz"]], %Context{})
     end
   end
 
   test "timeout raises AgentError", %{dir: dir} do
     stub_path = stub(dir, "pi", "sleep 5\n")
 
-    assert_raise RoastEx.AgentError, ~r/timed out/, fn ->
-      RoastEx.Cogs.Agent.run("hi", [command: [stub_path], timeout: 150], ctx(dir))
+    assert_raise Sanad.AgentError, ~r/timed out/, fn ->
+      Sanad.Cogs.Agent.run("hi", [command: [stub_path], timeout: 150], ctx(dir))
     end
   end
 end

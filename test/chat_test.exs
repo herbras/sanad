@@ -1,7 +1,7 @@
-defmodule RoastEx.Cogs.ChatTest do
+defmodule Sanad.Cogs.ChatTest do
   use ExUnit.Case, async: false
 
-  alias RoastEx.Context
+  alias Sanad.Context
 
   @env_vars ~w(
     OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY PERPLEXITY_API_KEY
@@ -18,7 +18,7 @@ defmodule RoastEx.Cogs.ChatTest do
   end
 
   defp run_chat(prompt, opts, config \\ %{}) do
-    RoastEx.Cogs.Chat.run(prompt, opts, %Context{config: RoastEx.Config.normalize(config)})
+    Sanad.Cogs.Chat.run(prompt, opts, %Context{config: Sanad.Config.normalize(config)})
   end
 
   test "openai returns text" do
@@ -124,7 +124,7 @@ defmodule RoastEx.Cogs.ChatTest do
   test "missing api key raises an actionable error" do
     System.delete_env("OPENAI_API_KEY")
 
-    assert_raise RoastEx.MissingEnvError, ~r/OPENAI_API_KEY/, fn ->
+    assert_raise Sanad.MissingEnvError, ~r/OPENAI_API_KEY/, fn ->
       run_chat("hi", provider: :openai)
     end
   end
@@ -134,7 +134,7 @@ defmodule RoastEx.Cogs.ChatTest do
       Plug.Conn.send_resp(conn, 401, ~s({"error":"bad key"}))
     end)
 
-    assert_raise RoastEx.ChatError, ~r/HTTP 401/, fn ->
+    assert_raise Sanad.ChatError, ~r/HTTP 401/, fn ->
       run_chat("hi", provider: :openai, req_options: [plug: {Req.Test, :err}])
     end
   end
@@ -142,13 +142,13 @@ defmodule RoastEx.Cogs.ChatTest do
   test "transport error raises ChatError without long retries" do
     Req.Test.stub(:tx, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
 
-    assert_raise RoastEx.ChatError, ~r/econnrefused/, fn ->
+    assert_raise Sanad.ChatError, ~r/econnrefused/, fn ->
       run_chat("hi", provider: :openai, max_retries: 0, req_options: [plug: {Req.Test, :tx}])
     end
   end
 
   test "unknown provider raises InvalidConfigError" do
-    assert_raise RoastEx.InvalidConfigError, ~r/provider/, fn ->
+    assert_raise Sanad.InvalidConfigError, ~r/provider/, fn ->
       run_chat("hi", provider: :bogus)
     end
   end

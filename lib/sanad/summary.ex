@@ -1,9 +1,9 @@
-defmodule RoastEx.Summary do
+defmodule Sanad.Summary do
   @moduledoc """
   Compact end-of-run summary and CLI param parsing.
   """
 
-  alias RoastEx.Context
+  alias Sanad.Context
 
   @doc """
   Renders a one-line result summary plus per-cog status/timing lines.
@@ -18,7 +18,7 @@ defmodule RoastEx.Summary do
       end)
 
     header =
-      "RoastEx workflow finished in #{elapsed_ms}ms — #{ok} ok, #{skipped} skipped, #{failed} failed"
+      "Sanad workflow finished in #{elapsed_ms}ms — #{ok} ok, #{skipped} skipped, #{failed} failed"
 
     lines =
       ctx.statuses

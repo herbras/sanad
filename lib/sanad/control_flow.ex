@@ -1,4 +1,4 @@
-defmodule RoastEx.ControlFlow do
+defmodule Sanad.ControlFlow do
   @moduledoc """
   Control-flow primitives, mirroring Roast's `skip!` / `fail!` / `next!` / `break!`.
 
@@ -15,7 +15,7 @@ defmodule RoastEx.ControlFlow do
   here they are attached to `fail!` aborts and ignored otherwise.
   """
 
-  @tag :roast_control
+  @tag :sanad_control
 
   @spec skip!(term()) :: no_return()
   def skip!(message \\ nil), do: throw({@tag, :skip, message})

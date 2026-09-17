@@ -1,9 +1,9 @@
-defmodule RoastEx.Runner do
+defmodule Sanad.Runner do
   @moduledoc """
   Recursive step runner.
 
-  Steps are data (`%{type, name, opts, fun}`) produced by `RoastEx.DSL`; the
-  runner resolves each step's cog through `RoastEx.Cog.Registry`, runs the
+  Steps are data (`%{type, name, opts, fun}`) produced by `Sanad.DSL`; the
+  runner resolves each step's cog through `Sanad.Cog.Registry`, runs the
   input block against the current context, and stores outputs by name.
 
   Control flow (`skip!`, `fail!`, `next!`, `break!`) is caught at the step
@@ -12,7 +12,7 @@ defmodule RoastEx.Runner do
   can implement Roast semantics.
   """
 
-  alias RoastEx.{Cog, Config, Context}
+  alias Sanad.{Cog, Config, Context}
 
   @typedoc "Signal returned by `run_steps/2` to the enclosing scope."
   @type control :: :ok | :next | :break
@@ -22,13 +22,13 @@ defmodule RoastEx.Runner do
   """
   def run(module, opts) when is_atom(module) do
     ctx = %Context{
-      config: Config.normalize(module.__roast_config__()),
+      config: Config.normalize(module.__sanad_config__()),
       params: Keyword.get(opts, :params, %{}),
       workflow_dir: Keyword.get(opts, :workflow_dir, File.cwd!()),
       module: module
     }
 
-    {ctx, _control} = run_steps(module.__roast_steps__(), ctx)
+    {ctx, _control} = run_steps(module.__sanad_steps__(), ctx)
     ctx
   end
 
@@ -83,12 +83,12 @@ defmodule RoastEx.Runner do
   end
 
   defp fetch_scope!(%Context{module: nil}, scope) do
-    raise RoastEx.UnknownScopeError, scope: scope, module: nil
+    raise Sanad.UnknownScopeError, scope: scope, module: nil
   end
 
   defp fetch_scope!(%Context{module: module}, scope) do
-    case Map.get(module.__roast_scopes__(), scope) do
-      nil -> raise RoastEx.UnknownScopeError, scope: scope, module: module
+    case Map.get(module.__sanad_scopes__(), scope) do
+      nil -> raise Sanad.UnknownScopeError, scope: scope, module: module
       steps -> steps
     end
   end
@@ -110,7 +110,7 @@ defmodule RoastEx.Runner do
         cog = fetch_cog!(type)
         {:ok, Cog.run(cog, input, opts, ctx)}
       catch
-        {:roast_control, kind, message} -> {:control, kind, message}
+        {:sanad_control, kind, message} -> {:control, kind, message}
       end
 
     elapsed = System.monotonic_time(:millisecond) - started
@@ -133,7 +133,7 @@ defmodule RoastEx.Runner do
     ctx = ctx |> Context.put_status(name, :failed) |> Context.put_failure(name, message)
 
     if Config.abort_on_failure?(ctx, opts) do
-      raise RoastEx.CogFailedError, name: name, reason: message
+      raise Sanad.CogFailedError, name: name, reason: message
     else
       {:cont, ctx}
     end
@@ -149,9 +149,9 @@ defmodule RoastEx.Runner do
   end
 
   defp fetch_cog!(type) do
-    case RoastEx.Cog.Registry.lookup(type) do
+    case Sanad.Cog.Registry.lookup(type) do
       {:ok, cog} -> cog
-      :error -> raise RoastEx.UnknownCogError, type: type
+      :error -> raise Sanad.UnknownCogError, type: type
     end
   end
 

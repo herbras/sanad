@@ -1,4 +1,4 @@
-defmodule RoastEx.Cogs.Call do
+defmodule Sanad.Cogs.Call do
   @moduledoc """
   Runs a named `execute :scope` block once with the value produced by the step
   block.
@@ -15,15 +15,15 @@ defmodule RoastEx.Cogs.Call do
         end
       end
 
-  The output is `%RoastEx.Output.Call{}` with the scope's final output in
+  The output is `%Sanad.Output.Call{}` with the scope's final output in
   `value` and the child context in `context` (see `from/2`).
 
   Options: `:scope` (required), `:index` (default 0, passed as `scope_index`).
   `next!` / `break!` inside the scope end it quietly, matching upstream Roast.
   """
 
-  alias RoastEx.{Output, Runner}
-  alias RoastEx.Cogs.Nested
+  alias Sanad.{Output, Runner}
+  alias Sanad.Cogs.Nested
 
   def run(value, opts, ctx) do
     scope = Nested.scope!(:call, opts)

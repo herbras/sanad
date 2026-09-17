@@ -1,8 +1,8 @@
-defmodule RoastEx.Cogs.Agent do
+defmodule Sanad.Cogs.Agent do
   @moduledoc """
   Local coding-agent cog, mirroring Roast's `agent` cog.
 
-  Invokes a provider CLI and returns its response as `%RoastEx.Output.Agent{}`:
+  Invokes a provider CLI and returns its response as `%Sanad.Output.Agent{}`:
 
   * `:pi` (default) — `pi --mode json -p [--model M] [--system-prompt S]
     [--append-system-prompt S] (--fork SESSION | --no-session)`; the prompt goes
@@ -16,7 +16,7 @@ defmodule RoastEx.Cogs.Agent do
   Options:
 
   * `:provider` — one of the providers above; falls back to workflow config and
-    `ROAST_DEFAULT_AGENT_PROVIDER` (default `:pi`).
+    `SANAD_DEFAULT_AGENT_PROVIDER` (default `:pi`).
   * `:model`, `:system_prompt`, `:append_system_prompt` (pi/claude)
   * `:command` — String or list overriding the base binary/argv prefix
     (useful for wrappers such as `pi -ne`, or a stub in tests).
@@ -26,8 +26,8 @@ defmodule RoastEx.Cogs.Agent do
   * `:env`, `:timeout`
   """
 
-  alias RoastEx.Context
-  alias RoastEx.Output.Agent
+  alias Sanad.Context
+  alias Sanad.Output.Agent
 
   @providers [:pi, :claude, :opencode, :agy]
 
@@ -44,7 +44,7 @@ defmodule RoastEx.Cogs.Agent do
       timeout: Keyword.get(opts, :timeout, :infinity)
     ]
 
-    case RoastEx.Command.run([binary | args], command_opts) do
+    case Sanad.Command.run([binary | args], command_opts) do
       {:ok, stdout, stderr, 0} ->
         %Agent{
           response: parse_response(provider, stdout),
@@ -53,12 +53,12 @@ defmodule RoastEx.Cogs.Agent do
         }
 
       {:ok, stdout, stderr, status} ->
-        raise RoastEx.AgentError,
+        raise Sanad.AgentError,
           provider: provider,
           reason: "exited with status #{status}: #{String.trim(stderr <> "\n" <> stdout)}"
 
       {:timeout, partial, stderr} ->
-        raise RoastEx.AgentError,
+        raise Sanad.AgentError,
           provider: provider,
           reason:
             "timed out after #{inspect(Keyword.get(opts, :timeout))}ms " <>
@@ -79,13 +79,13 @@ defmodule RoastEx.Cogs.Agent do
     if provider in @providers do
       provider
     else
-      raise RoastEx.InvalidConfigError,
+      raise Sanad.InvalidConfigError,
         message: "agent provider must be one of #{inspect(@providers)}, got: #{inspect(provider)}"
     end
   end
 
   defp default_provider do
-    case System.get_env("ROAST_DEFAULT_AGENT_PROVIDER") do
+    case System.get_env("SANAD_DEFAULT_AGENT_PROVIDER") do
       "claude" -> :claude
       "opencode" -> :opencode
       "agy" -> :agy
@@ -105,7 +105,7 @@ defmodule RoastEx.Cogs.Agent do
         Enum.map(command, &to_string/1)
 
       other ->
-        raise RoastEx.InvalidConfigError,
+        raise Sanad.InvalidConfigError,
           message: "agent :command must be a string or list, got: #{inspect(other)}"
     end
   end
@@ -174,7 +174,7 @@ defmodule RoastEx.Cogs.Agent do
 
   defp validate_executable!(binary, provider) do
     if System.find_executable(binary) == nil do
-      raise RoastEx.MissingExecutableError,
+      raise Sanad.MissingExecutableError,
         name: binary,
         hint:
           "agent provider #{inspect(provider)} requires the `#{binary}` CLI on PATH " <>
@@ -204,7 +204,7 @@ defmodule RoastEx.Cogs.Agent do
       |> decode_lines()
       |> Enum.reduce(nil, fn
         %{"type" => "result", "is_error" => true} = event, _acc ->
-          raise RoastEx.AgentError,
+          raise Sanad.AgentError,
             provider: :claude,
             reason: "claude reported an error: #{inspect(event["result"])}"
 

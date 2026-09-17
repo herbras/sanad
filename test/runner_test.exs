@@ -1,10 +1,10 @@
-defmodule RoastEx.RunnerTest do
+defmodule Sanad.RunnerTest do
   use ExUnit.Case, async: true
 
-  alias RoastEx.{Context, Helpers, Runner}
+  alias Sanad.{Context, Helpers, Runner}
 
   defmodule SkipWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:a, do: skip!())
@@ -13,7 +13,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   defmodule FailContinueWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     config do
       %{abort_on_failure: false}
@@ -26,7 +26,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   defmodule FailAbortWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:a, do: fail!("boom"))
@@ -35,7 +35,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   defmodule BreakWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:a, do: break!())
@@ -44,7 +44,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   defmodule NextWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:a, do: next!())
@@ -53,7 +53,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   test "skip! marks the output skipped and continues" do
-    ctx = RoastEx.run(SkipWorkflow)
+    ctx = Sanad.run(SkipWorkflow)
 
     assert ctx.statuses[:a] == :skipped
     refute Map.has_key?(ctx.outputs, :a)
@@ -61,7 +61,7 @@ defmodule RoastEx.RunnerTest do
   end
 
   test "fail! with abort_on_failure: false records failure and continues" do
-    ctx = RoastEx.run(FailContinueWorkflow)
+    ctx = Sanad.run(FailContinueWorkflow)
 
     assert ctx.statuses[:a] == :failed
     refute Map.has_key?(ctx.outputs, :a)
@@ -69,8 +69,8 @@ defmodule RoastEx.RunnerTest do
   end
 
   test "fail! with default abort_on_failure raises" do
-    assert_raise RoastEx.CogFailedError, ~r/"boom"/, fn ->
-      RoastEx.run(FailAbortWorkflow)
+    assert_raise Sanad.CogFailedError, ~r/"boom"/, fn ->
+      Sanad.run(FailAbortWorkflow)
     end
   end
 
@@ -80,7 +80,7 @@ defmodule RoastEx.RunnerTest do
         type: :elixir,
         name: :a,
         opts: [abort_on_failure: false],
-        fun: fn _ -> RoastEx.ControlFlow.fail!("x") end
+        fun: fn _ -> Sanad.ControlFlow.fail!("x") end
       },
       %{type: :elixir, name: :b, opts: [], fun: fn _ -> :ran end}
     ]
@@ -91,14 +91,14 @@ defmodule RoastEx.RunnerTest do
   end
 
   test "break! stops the remaining steps quietly" do
-    ctx = RoastEx.run(BreakWorkflow)
+    ctx = Sanad.run(BreakWorkflow)
 
     refute Map.has_key?(ctx.outputs, :b)
     assert ctx.statuses[:a] == nil
   end
 
   test "next! stops the remaining steps quietly" do
-    ctx = RoastEx.run(NextWorkflow)
+    ctx = Sanad.run(NextWorkflow)
 
     refute Map.has_key?(ctx.outputs, :b)
   end
@@ -106,7 +106,7 @@ defmodule RoastEx.RunnerTest do
   test "unknown cog type raises a clear error" do
     steps = [%{type: :nope, name: :x, opts: [], fun: fn _ctx -> :input end}]
 
-    assert_raise RoastEx.UnknownCogError, ~r/unknown cog type :nope/, fn ->
+    assert_raise Sanad.UnknownCogError, ~r/unknown cog type :nope/, fn ->
       Runner.run_steps(steps, %Context{})
     end
   end
@@ -117,18 +117,18 @@ defmodule RoastEx.RunnerTest do
       %{type: :elixir, name: :b, opts: [], fun: fn ctx -> Helpers.cmd!(ctx, :missing) end}
     ]
 
-    assert_raise RoastEx.OutputNotFoundError, ~r/:a/, fn ->
+    assert_raise Sanad.OutputNotFoundError, ~r/:a/, fn ->
       Runner.run_steps(steps, %Context{})
     end
   end
 
   test "reading a skipped output raises CogSkippedError" do
     steps = [
-      %{type: :elixir, name: :a, opts: [], fun: fn _ctx -> RoastEx.ControlFlow.skip!() end},
+      %{type: :elixir, name: :a, opts: [], fun: fn _ctx -> Sanad.ControlFlow.skip!() end},
       %{type: :elixir, name: :b, opts: [], fun: fn ctx -> Helpers.cmd!(ctx, :a) end}
     ]
 
-    assert_raise RoastEx.CogSkippedError, ~r/:a/, fn ->
+    assert_raise Sanad.CogSkippedError, ~r/:a/, fn ->
       Runner.run_steps(steps, %Context{})
     end
   end

@@ -1,4 +1,4 @@
-defmodule RoastEx.Cogs.Cmd do
+defmodule Sanad.Cogs.Cmd do
   @moduledoc """
   Runs a shell command (`sh -c`), mirroring Roast's `cmd` cog.
 
@@ -7,10 +7,10 @@ defmodule RoastEx.Cogs.Cmd do
   aborts the workflow unless `abort_on_failure` is disabled.
 
   Options: `:cwd`, `:env`, `:fail_on_error`, `:timeout` (ms; exceeding it
-  raises `RoastEx.CommandTimeoutError`).
+  raises `Sanad.CommandTimeoutError`).
   """
 
-  alias RoastEx.Output.Cmd
+  alias Sanad.Output.Cmd
 
   def run(command, opts, _ctx) when is_binary(command) do
     cwd = Keyword.get(opts, :cwd)
@@ -18,16 +18,16 @@ defmodule RoastEx.Cogs.Cmd do
     timeout = Keyword.get(opts, :timeout, :infinity)
     fail_on_error? = Keyword.get(opts, :fail_on_error, true)
 
-    case RoastEx.Command.run(["sh", "-c", command], cwd: cwd, env: env, timeout: timeout) do
+    case Sanad.Command.run(["sh", "-c", command], cwd: cwd, env: env, timeout: timeout) do
       {:ok, stdout, stderr, status} ->
         if status != 0 and fail_on_error? do
-          RoastEx.ControlFlow.fail!("command exited with status #{status}: #{command}")
+          Sanad.ControlFlow.fail!("command exited with status #{status}: #{command}")
         end
 
         %Cmd{stdout: stdout, stderr: stderr, status: status}
 
       {:timeout, stdout, stderr} ->
-        raise RoastEx.CommandTimeoutError,
+        raise Sanad.CommandTimeoutError,
           command: command,
           timeout: timeout,
           stdout: stdout,

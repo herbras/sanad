@@ -1,4 +1,4 @@
-defmodule RoastEx.Output do
+defmodule Sanad.Output do
   @moduledoc """
   Output structs returned by built-in cogs.
   """

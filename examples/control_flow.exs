@@ -5,13 +5,13 @@ defmodule ControlFlow do
   Shows `fail!` gated by `abort_on_failure` and `fail_on_error: false` on a cmd
   step. Run with:
 
-      mix roast.execute examples/control_flow.exs
+      mix sanad.execute examples/control_flow.exs
 
   To see the abort path, remove `"milk"` from `:shopping_list` — the workflow
-  then aborts with `RoastEx.CogFailedError`.
+  then aborts with `Sanad.CogFailedError`.
   """
 
-  use RoastEx.DSL
+  use Sanad.DSL
 
   config do
     %{abort_on_failure: true}

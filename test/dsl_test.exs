@@ -1,8 +1,8 @@
-defmodule RoastEx.DSLTest do
+defmodule Sanad.DSLTest do
   use ExUnit.Case, async: true
 
   defmodule SimpleWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     config do
       %{abort_on_failure: false, chat: %{provider: :openai}}
@@ -24,7 +24,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule StderrWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       cmd(:out, "echo out")
@@ -33,7 +33,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule ScopedWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:top, do: :top)
@@ -50,7 +50,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule PerStepOptsWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog :a, abort_on_failure: false do
@@ -62,7 +62,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule FailingCmdWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       cmd(:bad, "false")
@@ -71,7 +71,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule CmdOptsWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       cmd(:cwd, "pwd", cwd: "/tmp")
@@ -81,7 +81,7 @@ defmodule RoastEx.DSLTest do
   end
 
   defmodule ShadowCtxWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       elixir_cog(:shadow, do: Enum.map([1, 2], fn ctx -> ctx * 2 end))
@@ -89,19 +89,19 @@ defmodule RoastEx.DSLTest do
   end
 
   test "config is normalized" do
-    assert SimpleWorkflow.__roast_config__() ==
+    assert SimpleWorkflow.__sanad_config__() ==
              %{abort_on_failure: false, chat: %{provider: :openai}}
   end
 
   test "steps keep source order, types and names" do
-    steps = SimpleWorkflow.__roast_steps__()
+    steps = SimpleWorkflow.__sanad_steps__()
 
     assert Enum.map(steps, & &1.type) == [:cmd, :cmd, :elixir, :elixir]
     assert Enum.map(steps, & &1.name) == [:hello, :block_cmd, :calc, :uses_ctx]
   end
 
   test "runner executes cmd and elixir steps without network" do
-    ctx = RoastEx.run(SimpleWorkflow)
+    ctx = Sanad.run(SimpleWorkflow)
 
     assert ctx.outputs[:hello].stdout == "hello\n"
     assert ctx.outputs[:hello].stderr == ""
@@ -114,7 +114,7 @@ defmodule RoastEx.DSLTest do
   end
 
   test "cmd separates stderr from stdout" do
-    ctx = RoastEx.run(StderrWorkflow)
+    ctx = Sanad.run(StderrWorkflow)
 
     assert ctx.outputs[:out].stdout == "out\n"
     assert ctx.outputs[:out].stderr == ""
@@ -123,37 +123,37 @@ defmodule RoastEx.DSLTest do
   end
 
   test "named scopes are grouped and excluded from the default scope" do
-    scopes = ScopedWorkflow.__roast_scopes__()
+    scopes = ScopedWorkflow.__sanad_scopes__()
 
     assert Enum.sort(Map.keys(scopes)) == [:inner, nil, :other]
     assert Enum.map(scopes[nil], & &1.name) == [:top]
     assert Enum.map(scopes[:inner], & &1.name) == [:a, :b]
     assert Enum.map(scopes[:other], & &1.name) == [:c]
-    assert Enum.map(ScopedWorkflow.__roast_steps__(), & &1.name) == [:top]
+    assert Enum.map(ScopedWorkflow.__sanad_steps__(), & &1.name) == [:top]
   end
 
   test "top-level run does not execute named scopes" do
-    ctx = RoastEx.run(ScopedWorkflow)
+    ctx = Sanad.run(ScopedWorkflow)
 
     assert ctx.outputs[:top] == :top
     refute Map.has_key?(ctx.outputs, :a)
   end
 
   test "per-step abort_on_failure: false from DSL options" do
-    ctx = RoastEx.run(PerStepOptsWorkflow)
+    ctx = Sanad.run(PerStepOptsWorkflow)
 
     assert ctx.statuses[:a] == :failed
     assert ctx.outputs[:b] == :ran
   end
 
   test "cmd failure with default fail_on_error aborts the workflow" do
-    assert_raise RoastEx.CogFailedError, ~r/status 1/, fn ->
-      RoastEx.run(FailingCmdWorkflow)
+    assert_raise Sanad.CogFailedError, ~r/status 1/, fn ->
+      Sanad.run(FailingCmdWorkflow)
     end
   end
 
   test "cmd supports cwd, env and fail_on_error: false" do
-    ctx = RoastEx.run(CmdOptsWorkflow)
+    ctx = Sanad.run(CmdOptsWorkflow)
 
     assert String.trim(ctx.outputs[:cwd].stdout) in ["/tmp", "/private/tmp"]
     assert String.trim(ctx.outputs[:env].stdout) == "ok"
@@ -161,7 +161,7 @@ defmodule RoastEx.DSLTest do
   end
 
   test "ctx shadowed by a nested fn does not break the step" do
-    ctx = RoastEx.run(ShadowCtxWorkflow)
+    ctx = Sanad.run(ShadowCtxWorkflow)
 
     assert ctx.outputs[:shadow] == [2, 4]
   end

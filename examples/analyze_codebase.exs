@@ -1,5 +1,5 @@
 defmodule AnalyzeCodebase do
-  use RoastEx.DSL
+  use Sanad.DSL
 
   config do
     %{

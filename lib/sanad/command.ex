@@ -1,4 +1,4 @@
-defmodule RoastEx.Command do
+defmodule Sanad.Command do
   @moduledoc false
 
   # Internal external-command runner used by the cmd and agent cogs.
@@ -101,7 +101,7 @@ defmodule RoastEx.Command do
   end
 
   defp temp_path(label) do
-    Path.join(System.tmp_dir!(), "roast_ex_#{label}_#{System.unique_integer([:positive])}")
+    Path.join(System.tmp_dir!(), "sanad_#{label}_#{System.unique_integer([:positive])}")
   end
 
   defp read_and_rm(path) do

@@ -1,9 +1,9 @@
-defmodule RoastEx.Context do
+defmodule Sanad.Context do
   @moduledoc """
   Runtime context: named cog outputs plus their statuses, config, params and
   scope bookkeeping.
 
-  Nested execution (see `RoastEx.Cogs.Call`, `Map`, `Repeat`) uses child
+  Nested execution (see `Sanad.Cogs.Call`, `Map`, `Repeat`) uses child
   contexts with their own outputs; `scope_value` / `scope_index` carry the
   value and index of the current nested invocation.
   """
@@ -87,13 +87,13 @@ defmodule RoastEx.Context do
       :error ->
         case Map.get(ctx.statuses, name) do
           :skipped ->
-            raise RoastEx.CogSkippedError, name: name
+            raise Sanad.CogSkippedError, name: name
 
           :failed ->
-            raise RoastEx.CogFailedError, name: name, reason: Map.get(ctx.failures, name)
+            raise Sanad.CogFailedError, name: name, reason: Map.get(ctx.failures, name)
 
           _ ->
-            raise RoastEx.OutputNotFoundError, name: name, outputs: ctx.outputs
+            raise Sanad.OutputNotFoundError, name: name, outputs: ctx.outputs
         end
     end
   end

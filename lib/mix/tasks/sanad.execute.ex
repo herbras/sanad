@@ -1,14 +1,14 @@
-defmodule Mix.Tasks.Roast.Execute do
+defmodule Mix.Tasks.Sanad.Execute do
   use Mix.Task
 
-  @shortdoc "Execute a RoastEx workflow module"
+  @shortdoc "Execute a Sanad workflow module"
 
   @moduledoc """
-  Runs a RoastEx workflow file:
+  Runs a Sanad workflow file:
 
-      mix roast.execute path/to/workflow.exs [--module ModuleName] [--param key=value ...]
+      mix sanad.execute path/to/workflow.exs [--module ModuleName] [--param key=value ...]
 
-  Params are available inside workflows via `RoastEx.Helpers.params/1`.
+  Params are available inside workflows via `Sanad.Helpers.params/1`.
   """
 
   @impl Mix.Task
@@ -26,20 +26,18 @@ defmodule Mix.Tasks.Roast.Execute do
         started = System.monotonic_time(:millisecond)
 
         ctx =
-          RoastEx.run_file(path,
+          Sanad.run_file(path,
             module: opts[:module],
-            params: RoastEx.Summary.parse_params(Keyword.get_values(opts, :param))
+            params: Sanad.Summary.parse_params(Keyword.get_values(opts, :param))
           )
 
-        Mix.shell().info(
-          RoastEx.Summary.render(ctx, System.monotonic_time(:millisecond) - started)
-        )
+        Mix.shell().info(Sanad.Summary.render(ctx, System.monotonic_time(:millisecond) - started))
 
         Mix.shell().info(inspect(ctx.outputs, pretty: true, limit: :infinity))
 
       _ ->
         Mix.raise(
-          "usage: mix roast.execute path/to/workflow.exs [--module ModuleName] [--param key=value ...]"
+          "usage: mix sanad.execute path/to/workflow.exs [--module ModuleName] [--param key=value ...]"
         )
     end
   end

@@ -5,10 +5,10 @@ defmodule ReusableScopes do
   Shows named scopes, `call_cog`, and reading inner outputs with `from/2`.
   Run with:
 
-      mix roast.execute examples/reusable_scopes.exs
+      mix sanad.execute examples/reusable_scopes.exs
   """
 
-  use RoastEx.DSL
+  use Sanad.DSL
 
   execute do
     call_cog :separator, scope: :print_separator do

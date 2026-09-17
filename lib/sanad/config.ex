@@ -1,4 +1,4 @@
-defmodule RoastEx.Config do
+defmodule Sanad.Config do
   @moduledoc """
   Configuration helpers for workflows.
 
@@ -16,7 +16,7 @@ defmodule RoastEx.Config do
   Keyword lists are normalized to maps recursively, so both shapes work.
   """
 
-  alias RoastEx.Context
+  alias Sanad.Context
 
   @doc """
   Normalizes nested keyword lists into maps so cogs can use `Map.get/3`
@@ -54,8 +54,8 @@ defmodule RoastEx.Config do
   @spec fetch_env!(String.t(), String.t() | nil) :: String.t()
   def fetch_env!(name, hint \\ nil) when is_binary(name) do
     case System.get_env(name) do
-      nil -> raise RoastEx.MissingEnvError, name: name, hint: hint
-      "" -> raise RoastEx.MissingEnvError, name: name, hint: hint
+      nil -> raise Sanad.MissingEnvError, name: name, hint: hint
+      "" -> raise Sanad.MissingEnvError, name: name, hint: hint
       value -> value
     end
   end

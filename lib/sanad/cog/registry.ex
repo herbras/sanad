@@ -1,20 +1,20 @@
-defmodule RoastEx.Cog.Registry do
+defmodule Sanad.Cog.Registry do
   @moduledoc """
   Maps step `type` atoms to cog modules.
 
   Built-ins are fixed; custom cogs are registered through the application
-  environment (`Application.put_env(:roast_ex, :cogs, %{...})` via
+  environment (`Application.put_env(:sanad, :cogs, %{...})` via
   `register/2`), which lets tests and user code extend the workflow DSL.
   """
 
   @builtin %{
-    cmd: RoastEx.Cogs.Cmd,
-    chat: RoastEx.Cogs.Chat,
-    agent: RoastEx.Cogs.Agent,
-    elixir: RoastEx.Cogs.ElixirCog,
-    map: RoastEx.Cogs.Map,
-    call: RoastEx.Cogs.Call,
-    repeat: RoastEx.Cogs.Repeat
+    cmd: Sanad.Cogs.Cmd,
+    chat: Sanad.Cogs.Chat,
+    agent: Sanad.Cogs.Agent,
+    elixir: Sanad.Cogs.ElixirCog,
+    map: Sanad.Cogs.Map,
+    call: Sanad.Cogs.Call,
+    repeat: Sanad.Cogs.Repeat
   }
 
   @type cog_type :: atom()
@@ -23,7 +23,7 @@ defmodule RoastEx.Cog.Registry do
   @doc "Looks up the cog module for a step type."
   @spec lookup(cog_type()) :: {:ok, cog_module()} | :error
   def lookup(type) when is_atom(type) do
-    overrides = Application.get_env(:roast_ex, :cogs, %{})
+    overrides = Application.get_env(:sanad, :cogs, %{})
 
     cond do
       Map.has_key?(overrides, type) -> {:ok, Map.fetch!(overrides, type)}
@@ -40,8 +40,8 @@ defmodule RoastEx.Cog.Registry do
   """
   @spec register(cog_type(), cog_module()) :: :ok
   def register(type, module) when is_atom(type) and is_atom(module) and not is_nil(module) do
-    overrides = Application.get_env(:roast_ex, :cogs, %{})
-    Application.put_env(:roast_ex, :cogs, Map.put(overrides, type, module))
+    overrides = Application.get_env(:sanad, :cogs, %{})
+    Application.put_env(:sanad, :cogs, Map.put(overrides, type, module))
     :ok
   end
 
@@ -52,8 +52,8 @@ defmodule RoastEx.Cog.Registry do
   @doc "Removes a previously registered override."
   @spec unregister(cog_type()) :: :ok
   def unregister(type) when is_atom(type) do
-    overrides = Application.get_env(:roast_ex, :cogs, %{})
-    Application.put_env(:roast_ex, :cogs, Map.delete(overrides, type))
+    overrides = Application.get_env(:sanad, :cogs, %{})
+    Application.put_env(:sanad, :cogs, Map.delete(overrides, type))
     :ok
   end
 
@@ -64,7 +64,7 @@ defmodule RoastEx.Cog.Registry do
   @doc "All currently resolvable step types (built-ins plus overrides)."
   @spec types() :: [cog_type()]
   def types do
-    overrides = Application.get_env(:roast_ex, :cogs, %{})
+    overrides = Application.get_env(:sanad, :cogs, %{})
     Enum.uniq(Map.keys(@builtin) ++ Map.keys(overrides))
   end
 end

@@ -1,4 +1,4 @@
-defmodule RoastEx.Cogs.Chat do
+defmodule Sanad.Cogs.Chat do
   @moduledoc """
   Cloud LLM cog with OpenAI, Anthropic, Gemini and Perplexity providers.
 
@@ -24,7 +24,7 @@ defmodule RoastEx.Cogs.Chat do
 
   ## Options
 
-  * `:provider` — defaults to `ROAST_DEFAULT_CHAT_PROVIDER` or `:openai`
+  * `:provider` — defaults to `SANAD_DEFAULT_CHAT_PROVIDER` or `:openai`
   * `:model`
   * `:system_prompt`, `:temperature`, `:max_tokens`
   * `:api_key` (literal), `:key_env` (env var name), `:base_url`
@@ -33,12 +33,12 @@ defmodule RoastEx.Cogs.Chat do
     `retry: :transient`)
   * `:req_options` — extra `Req` options, e.g. `plug: {Req.Test, Name}` in tests
 
-  Failures raise `RoastEx.ChatError`; missing keys raise
-  `RoastEx.MissingEnvError`; invalid providers `RoastEx.InvalidConfigError`.
+  Failures raise `Sanad.ChatError`; missing keys raise
+  `Sanad.MissingEnvError`; invalid providers `Sanad.InvalidConfigError`.
   """
 
-  alias RoastEx.Config
-  alias RoastEx.Output.Chat
+  alias Sanad.Config
+  alias Sanad.Output.Chat
 
   @providers [:openai, :anthropic, :gemini, :perplexity]
 
@@ -62,10 +62,10 @@ defmodule RoastEx.Cogs.Chat do
         %Chat{response: extract_text(provider, body), model: model, provider: provider, raw: body}
 
       {:ok, %{status: status, body: body}} ->
-        raise RoastEx.ChatError, provider: provider, status: status, body: body
+        raise Sanad.ChatError, provider: provider, status: status, body: body
 
       {:error, reason} ->
-        raise RoastEx.ChatError, provider: provider, reason: reason
+        raise Sanad.ChatError, provider: provider, reason: reason
     end
   end
 
@@ -79,13 +79,13 @@ defmodule RoastEx.Cogs.Chat do
     if provider in @providers do
       provider
     else
-      raise RoastEx.InvalidConfigError,
+      raise Sanad.InvalidConfigError,
         message: "chat provider must be one of #{inspect(@providers)}, got: #{inspect(provider)}"
     end
   end
 
   defp default_provider do
-    case System.get_env("ROAST_DEFAULT_CHAT_PROVIDER") do
+    case System.get_env("SANAD_DEFAULT_CHAT_PROVIDER") do
       "anthropic" -> :anthropic
       "gemini" -> :gemini
       "perplexity" -> :perplexity
@@ -228,7 +228,7 @@ defmodule RoastEx.Cogs.Chat do
        do: text
 
   defp extract_text(provider, body) do
-    raise RoastEx.ChatError,
+    raise Sanad.ChatError,
       provider: provider,
       reason: "could not extract text from response: #{inspect(body)}"
   end

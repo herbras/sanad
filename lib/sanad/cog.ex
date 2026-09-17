@@ -1,16 +1,16 @@
-defmodule RoastEx.Cog do
+defmodule Sanad.Cog do
   @moduledoc """
-  Behaviour for RoastEx cogs.
+  Behaviour for Sanad cogs.
 
   A cog receives the value produced by its step's input block, the step options,
   and the runtime context, and returns an output value that is stored under the
   step name.
 
-  Built-in cogs live under `RoastEx.Cogs`; custom cogs can be registered with
-  `RoastEx.Cog.Registry.register/2`.
+  Built-in cogs live under `Sanad.Cogs`; custom cogs can be registered with
+  `Sanad.Cog.Registry.register/2`.
   """
 
-  alias RoastEx.Context
+  alias Sanad.Context
 
   @typedoc "Value produced by a step's input block (before the cog runs)."
   @type input :: term()

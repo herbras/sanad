@@ -1,7 +1,7 @@
-defmodule RoastEx.ConfigTest do
+defmodule Sanad.ConfigTest do
   use ExUnit.Case, async: true
 
-  alias RoastEx.Config
+  alias Sanad.Config
 
   test "normalizes nested keyword lists to maps" do
     assert Config.normalize(chat: [provider: :openai], agent: %{provider: :pi}) ==

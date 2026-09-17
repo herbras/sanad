@@ -1,4 +1,4 @@
-defmodule RoastEx do
+defmodule Sanad do
   @moduledoc """
   Elixir rewrite of Shopify Roast: structured AI workflows as composable cogs.
 
@@ -6,7 +6,7 @@ defmodule RoastEx do
   runtime executes them and stores named outputs.
   """
 
-  defdelegate run(module_or_file, opts \\ []), to: RoastEx.Runner
+  defdelegate run(module_or_file, opts \\ []), to: Sanad.Runner
 
   @doc """
   Loads a workflow file and runs its module.
@@ -15,10 +15,10 @@ defmodule RoastEx do
 
   * `:module` — module defined in the file (default: inferred from the file
     name, e.g. `my_workflow.exs` → `MyWorkflow`)
-  * `:params` — workflow params map (see `RoastEx.Helpers.params/1`)
+  * `:params` — workflow params map (see `Sanad.Helpers.params/1`)
   * `:workflow_dir` — defaults to the file's directory
   """
-  @spec run_file(Path.t(), keyword()) :: RoastEx.Context.t()
+  @spec run_file(Path.t(), keyword()) :: Sanad.Context.t()
   def run_file(path, opts \\ []) do
     Code.require_file(path)
     module = opts[:module] || guess_module(path)
@@ -28,7 +28,7 @@ defmodule RoastEx do
       |> Keyword.delete(:module)
       |> Keyword.put_new(:workflow_dir, Path.dirname(path))
 
-    RoastEx.Runner.run(Module.concat([module]), opts)
+    Sanad.Runner.run(Module.concat([module]), opts)
   end
 
   @doc """

@@ -1,7 +1,7 @@
-defmodule RoastEx.Cog.RegistryTest do
+defmodule Sanad.Cog.RegistryTest do
   use ExUnit.Case, async: false
 
-  alias RoastEx.{Context, Runner}
+  alias Sanad.{Context, Runner}
 
   defmodule FakeCog do
     def run(input, _opts, _ctx), do: {:fake, input}
@@ -14,14 +14,14 @@ defmodule RoastEx.Cog.RegistryTest do
   end
 
   setup do
-    RoastEx.Cog.Registry.register(:fake, FakeCog)
-    on_exit(fn -> RoastEx.Cog.Registry.unregister(:fake) end)
+    Sanad.Cog.Registry.register(:fake, FakeCog)
+    on_exit(fn -> Sanad.Cog.Registry.unregister(:fake) end)
   end
 
   test "registry resolves builtins and overrides" do
-    assert {:ok, RoastEx.Cogs.Cmd} = RoastEx.Cog.Registry.lookup(:cmd)
-    assert {:ok, FakeCog} = RoastEx.Cog.Registry.lookup(:fake)
-    assert :error = RoastEx.Cog.Registry.lookup(:missing)
+    assert {:ok, Sanad.Cogs.Cmd} = Sanad.Cog.Registry.lookup(:cmd)
+    assert {:ok, FakeCog} = Sanad.Cog.Registry.lookup(:fake)
+    assert :error = Sanad.Cog.Registry.lookup(:missing)
   end
 
   test "runner executes a registered custom cog" do
@@ -32,8 +32,8 @@ defmodule RoastEx.Cog.RegistryTest do
   end
 
   test "validate_input/2 is enforced when a cog implements it" do
-    RoastEx.Cog.Registry.register(:validating, ValidatingCog)
-    on_exit(fn -> RoastEx.Cog.Registry.unregister(:validating) end)
+    Sanad.Cog.Registry.register(:validating, ValidatingCog)
+    on_exit(fn -> Sanad.Cog.Registry.unregister(:validating) end)
 
     good = [%{type: :validating, name: :x, opts: [], fun: fn _ctx -> 21 end}]
     {ctx, :ok} = Runner.run_steps(good, %Context{})
@@ -48,7 +48,7 @@ defmodule RoastEx.Cog.RegistryTest do
 
   test "register/2 rejects nil modules" do
     assert_raise ArgumentError, ~r/cannot be nil/, fn ->
-      RoastEx.Cog.Registry.register(:bad, nil)
+      Sanad.Cog.Registry.register(:bad, nil)
     end
   end
 end

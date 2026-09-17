@@ -1,7 +1,7 @@
-defmodule RoastEx.Cogs.CmdTest do
+defmodule Sanad.Cogs.CmdTest do
   use ExUnit.Case, async: true
 
-  alias RoastEx.{Context, Runner}
+  alias Sanad.{Context, Runner}
 
   defp run(command, opts \\ []) do
     step = %{type: :cmd, name: :x, opts: opts, fun: fn _ctx -> command end}
@@ -30,7 +30,7 @@ defmodule RoastEx.Cogs.CmdTest do
   end
 
   test "timeout raises CommandTimeoutError" do
-    assert_raise RoastEx.CommandTimeoutError, ~r/timed out/, fn ->
+    assert_raise Sanad.CommandTimeoutError, ~r/timed out/, fn ->
       run("sleep 5", timeout: 100)
     end
   end

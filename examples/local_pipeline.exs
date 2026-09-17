@@ -4,10 +4,10 @@ defmodule LocalPipeline do
 
   Run with:
 
-      mix roast.execute examples/local_pipeline.exs --module LocalPipeline
+      mix sanad.execute examples/local_pipeline.exs --module LocalPipeline
   """
 
-  use RoastEx.DSL
+  use Sanad.DSL
 
   config do
     %{abort_on_failure: true}

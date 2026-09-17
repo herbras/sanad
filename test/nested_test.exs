@@ -1,10 +1,10 @@
-defmodule RoastEx.NestedTest do
+defmodule Sanad.NestedTest do
   use ExUnit.Case, async: true
 
-  alias RoastEx.{Context, Helpers, Runner}
+  alias Sanad.{Context, Helpers, Runner}
 
   defmodule CallWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     config do
       %{abort_on_failure: false}
@@ -25,7 +25,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule IndexWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       call_cog :c, scope: :index_echo, index: 7 do
@@ -39,7 +39,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule EmptyScopeWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       call_cog :empty, scope: :empty_scope do
@@ -54,7 +54,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule MapWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     config do
       %{abort_on_failure: false}
@@ -76,7 +76,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule MapBreakWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       map_cog :taken, scope: :stop_at_three do
@@ -93,7 +93,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule ParallelBreakWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       map_cog :cancelled, scope: :slow_then_break, parallel: 3 do
@@ -140,7 +140,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule MapFailureWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       map_cog :bad, scope: :boom do
@@ -154,7 +154,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule ParallelErrorWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       map_cog :bad, scope: :raiser, parallel: 4 do
@@ -171,7 +171,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule InitialIndexWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       map_cog :idx, scope: :echo_index, parallel: 0, initial_index: 10 do
@@ -185,7 +185,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule RepeatWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       repeat_cog :counter, scope: :count_up, max_iterations: 10 do
@@ -203,7 +203,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule NilMaxRepeatWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       repeat_cog :unbounded, scope: :count_two, max_iterations: nil do
@@ -221,7 +221,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule MaxIterationsWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     execute do
       repeat_cog :limited, scope: :increment, max_iterations: 3 do
@@ -239,7 +239,7 @@ defmodule RoastEx.NestedTest do
   end
 
   defmodule CallFailWorkflow do
-    use RoastEx.DSL
+    use Sanad.DSL
 
     config do
       %{abort_on_failure: false}
@@ -260,7 +260,7 @@ defmodule RoastEx.NestedTest do
   end
 
   test "call runs a named scope and isolates outputs" do
-    ctx = RoastEx.run(CallWorkflow)
+    ctx = Sanad.run(CallWorkflow)
 
     assert ctx.outputs[:a] == :outer
     assert ctx.outputs[:inner_result].value == :last_inner
@@ -271,22 +271,22 @@ defmodule RoastEx.NestedTest do
   end
 
   test "call passes :index as scope_index" do
-    ctx = RoastEx.run(IndexWorkflow)
+    ctx = Sanad.run(IndexWorkflow)
 
     assert ctx.outputs[:c].value == 7
     assert ctx.outputs[:c].index == 7
   end
 
   test "empty named scopes are runnable and return nil" do
-    ctx = RoastEx.run(EmptyScopeWorkflow)
+    ctx = Sanad.run(EmptyScopeWorkflow)
 
-    assert Map.has_key?(EmptyScopeWorkflow.__roast_scopes__(), :empty_scope)
+    assert Map.has_key?(EmptyScopeWorkflow.__sanad_scopes__(), :empty_scope)
     assert ctx.outputs[:empty].value == nil
     assert ctx.outputs[:after] == :ok
   end
 
   test "map runs nested cogs serially and in parallel, preserving order" do
-    ctx = RoastEx.run(MapWorkflow)
+    ctx = Sanad.run(MapWorkflow)
 
     assert ctx.outputs[:parallel_map].items == [2, 4, 6]
     assert ctx.outputs[:serial_map].items == [8, 10]
@@ -295,21 +295,21 @@ defmodule RoastEx.NestedTest do
   end
 
   test "map preserves order with real work per item" do
-    ctx = RoastEx.run(InitialIndexWorkflow)
+    ctx = Sanad.run(InitialIndexWorkflow)
 
     assert ctx.outputs[:idx].items == [10, 11, 12]
     assert Helpers.from(ctx.outputs[:idx], & &1.scope_value) == [1, 2, 3]
   end
 
   test "inner outputs are namespaced and do not overwrite outer outputs" do
-    ctx = RoastEx.run(MapWorkflow)
+    ctx = Sanad.run(MapWorkflow)
 
     refute Map.has_key?(ctx.outputs, :double)
     assert ctx.outputs[:parallel_map].contexts |> Enum.all?(&(&1.outputs[:double] != nil))
   end
 
   test "break! inside a map iteration stops remaining iterations with nil gaps" do
-    ctx = RoastEx.run(MapBreakWorkflow)
+    ctx = Sanad.run(MapBreakWorkflow)
 
     assert ctx.outputs[:taken].items == [1, 2, nil, nil]
   end
@@ -317,20 +317,20 @@ defmodule RoastEx.NestedTest do
   @tag capture_log: true
   test "errors inside nested scopes propagate" do
     assert_raise RuntimeError, ~r/boom inside scope/, fn ->
-      RoastEx.run(MapFailureWorkflow)
+      Sanad.run(MapFailureWorkflow)
     end
   end
 
   @tag capture_log: true
   test "parallel errors keep the original exception type and message" do
     assert_raise RuntimeError, ~r/parallel boom/, fn ->
-      RoastEx.run(ParallelErrorWorkflow)
+      Sanad.run(ParallelErrorWorkflow)
     end
   end
 
   test "parallel break! cancels still-running siblings promptly" do
     started = System.monotonic_time(:millisecond)
-    ctx = RoastEx.run(ParallelBreakWorkflow)
+    ctx = Sanad.run(ParallelBreakWorkflow)
     elapsed = System.monotonic_time(:millisecond) - started
 
     # Without cancellation the slow sibling (2s sleep) would dominate.
@@ -339,13 +339,13 @@ defmodule RoastEx.NestedTest do
   end
 
   test "parallel break! keeps siblings that already completed" do
-    ctx = RoastEx.run(ParallelBreakWorkflow)
+    ctx = Sanad.run(ParallelBreakWorkflow)
 
     assert ctx.outputs[:kept].items == [:done0, nil, :done2]
   end
 
   test "collect/2 maps run iterations and keeps unrun gaps nil" do
-    ctx = RoastEx.run(MapBreakWorkflow)
+    ctx = Sanad.run(MapBreakWorkflow)
     collected = Helpers.collect(ctx.outputs[:taken], fn item -> {:got, item} end)
 
     # iteration 2 ran and broke (nil output); iteration 3 never ran.
@@ -353,7 +353,7 @@ defmodule RoastEx.NestedTest do
   end
 
   test "reduce/3 is accumulator-first and ignores a nil block return" do
-    ctx = RoastEx.run(MapWorkflow)
+    ctx = Sanad.run(MapWorkflow)
 
     assert Helpers.reduce(ctx.outputs[:serial_map], [], fn acc, item -> acc ++ [item] end) == [
              8,
@@ -364,7 +364,7 @@ defmodule RoastEx.NestedTest do
   end
 
   test "repeat feeds final output forward and stops on break!" do
-    ctx = RoastEx.run(RepeatWorkflow)
+    ctx = Sanad.run(RepeatWorkflow)
 
     assert ctx.outputs[:counter].results == [1, 2, 3, nil]
     assert ctx.outputs[:counter].value == nil
@@ -374,20 +374,20 @@ defmodule RoastEx.NestedTest do
   end
 
   test "repeat accepts max_iterations: nil as no guard" do
-    ctx = RoastEx.run(NilMaxRepeatWorkflow)
+    ctx = Sanad.run(NilMaxRepeatWorkflow)
 
     assert ctx.outputs[:unbounded].results == [1, 2, nil]
   end
 
   test "repeat honors max_iterations and the 1000-iteration default guard" do
-    ctx = RoastEx.run(MaxIterationsWorkflow)
+    ctx = Sanad.run(MaxIterationsWorkflow)
 
     assert ctx.outputs[:limited].results == [1, 2, 3]
     assert length(ctx.outputs[:defaulted].results) == 1000
   end
 
   test "fail! inside a call scope (continue mode) does not abort the outer workflow" do
-    ctx = RoastEx.run(CallFailWorkflow)
+    ctx = Sanad.run(CallFailWorkflow)
 
     assert ctx.outputs[:after] == :ran
     assert ctx.outputs[:r].context.statuses[:a] == :failed
@@ -398,7 +398,7 @@ defmodule RoastEx.NestedTest do
   test "unknown scope raises a clear error" do
     steps = [%{type: :call, name: :x, opts: [scope: :nope], fun: fn _ctx -> 1 end}]
 
-    assert_raise RoastEx.UnknownScopeError, ~r/unknown execution scope :nope/, fn ->
+    assert_raise Sanad.UnknownScopeError, ~r/unknown execution scope :nope/, fn ->
       Runner.run_steps(steps, %Context{module: CallWorkflow})
     end
   end
@@ -412,11 +412,11 @@ defmodule RoastEx.NestedTest do
   end
 
   test "duplicate cog names in one scope raise a compile error" do
-    module = "RoastEx.DuplicateCogName#{System.unique_integer([:positive])}"
+    module = "Sanad.DuplicateCogName#{System.unique_integer([:positive])}"
 
     source = """
     defmodule #{module} do
-      use RoastEx.DSL
+      use Sanad.DSL
 
       execute do
         elixir_cog(:x, do: 1)

@@ -1,4 +1,4 @@
-defmodule RoastEx.Cogs.Map do
+defmodule Sanad.Cogs.Map do
   @moduledoc """
   Runs a named `execute :scope` block once per item of a collection.
 
@@ -16,7 +16,7 @@ defmodule RoastEx.Cogs.Map do
 
   Each iteration runs in an isolated child context whose `scope_value` is the
   item and whose `scope_index` is its position. The output is a
-  `%RoastEx.Output.MapResult{}`:
+  `%Sanad.Output.MapResult{}`:
 
   * `items` — each iteration's final output, in input order; `nil` for
     iterations that never ran.
@@ -41,9 +41,9 @@ defmodule RoastEx.Cogs.Map do
     caller with its original type and stacktrace.
   """
 
-  alias RoastEx.Runner
-  alias RoastEx.Cogs.Nested
-  alias RoastEx.Output.MapResult
+  alias Sanad.Runner
+  alias Sanad.Cogs.Nested
+  alias Sanad.Output.MapResult
 
   def run(collection, opts, ctx) do
     scope = Nested.scope!(:map, opts)
@@ -141,7 +141,7 @@ defmodule RoastEx.Cogs.Map do
     [{item, scope_index, position} | rest] = state.pending
 
     task =
-      Task.Supervisor.async_nolink(RoastEx.TaskSupervisor, fn ->
+      Task.Supervisor.async_nolink(Sanad.TaskSupervisor, fn ->
         Runner.run_scope(state.ctx, state.scope, item, scope_index)
       end)
 

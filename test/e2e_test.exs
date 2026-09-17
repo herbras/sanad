@@ -1,6 +1,6 @@
-defmodule RoastEx.E2ETest do
+defmodule Sanad.E2ETest do
   @moduledoc """
-  End-to-end tests: run workflow files through the real `mix roast.execute` CLI
+  End-to-end tests: run workflow files through the real `mix sanad.execute` CLI
   in separate OS processes (file -> Code.require_file -> DSL -> runner -> cogs
   -> summary + printed outputs), with no network or API keys involved.
   """
@@ -10,20 +10,20 @@ defmodule RoastEx.E2ETest do
   @project_root Path.expand("..", __DIR__)
 
   defp run_cli(args) do
-    System.cmd("mix", ["roast.execute" | args],
+    System.cmd("mix", ["sanad.execute" | args],
       cd: @project_root,
       stderr_to_stdout: true,
       env: [{"MIX_ENV", "test"}]
     )
   end
 
-  test "mix roast.execute runs a full cmd/elixir/call/map/repeat workflow" do
+  test "mix sanad.execute runs a full cmd/elixir/call/map/repeat workflow" do
     {output, status} = run_cli(["examples/local_pipeline.exs", "--module", "LocalPipeline"])
 
-    assert status == 0, "mix roast.execute exited #{status}:\n#{output}"
+    assert status == 0, "mix sanad.execute exited #{status}:\n#{output}"
 
     # summary line
-    assert output =~ "RoastEx workflow finished in"
+    assert output =~ "Sanad workflow finished in"
     # cmd + elixir cog
     assert output =~ ~s("hello world")
     # call + nested scope final output
@@ -71,7 +71,7 @@ defmodule RoastEx.E2ETest do
 
     File.write!(path, """
     defmodule RoastFailingWorkflow do
-      use RoastEx.DSL
+      use Sanad.DSL
 
       execute do
         elixir_cog(:a, do: fail!("intentional failure"))

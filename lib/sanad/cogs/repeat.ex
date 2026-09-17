@@ -1,4 +1,4 @@
-defmodule RoastEx.Cogs.Repeat do
+defmodule Sanad.Cogs.Repeat do
   @moduledoc """
   Runs a named `execute :scope` block repeatedly.
 
@@ -18,7 +18,7 @@ defmodule RoastEx.Cogs.Repeat do
 
   The step block supplies the first iteration's `scope_value`; each iteration's
   final output becomes the next iteration's `scope_value` (upstream Roast
-  semantics). The output is `%RoastEx.Output.Repeat{}` with `results` (one final
+  semantics). The output is `%Sanad.Output.Repeat{}` with `results` (one final
   output per iteration, `nil` for the iteration that called `break!`) and the
   matching child `contexts`.
 
@@ -29,9 +29,9 @@ defmodule RoastEx.Cogs.Repeat do
     disables the guard (upstream Roast has no guard at all).
   """
 
-  alias RoastEx.Runner
-  alias RoastEx.Cogs.Nested
-  alias RoastEx.Output.Repeat
+  alias Sanad.Runner
+  alias Sanad.Cogs.Nested
+  alias Sanad.Output.Repeat
 
   @default_max_iterations 1000
 

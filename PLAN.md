@@ -1,4 +1,4 @@
-# RoastEx — execution plan
+# Sanad — execution plan
 
 Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
@@ -28,7 +28,7 @@ render log yang pixel-perfect.
 ## Slice A — foundation
 
 - [x] A1 Fix DSL: step storage pakai generated function (hindari fun-in-attribute), `config` andal, block form `cmd`/`chat`/`agent` hidup, hilangkan arity clash & warning.
-- [x] A2 `RoastEx.Cog` behaviour + `RoastEx.Cog.Registry` (builtin + override via application env). Runner pakai registry, bukan `case`.
+- [x] A2 `Sanad.Cog` behaviour + `Sanad.Cog.Registry` (builtin + override via application env). Runner pakai registry, bukan `case`.
 - [x] A3 Control flow: `skip!/fail!/next!/break!` (throw), `abort_on_failure` per-step + global; status per output (`:ok/:skipped/:failed`).
 - [x] A4 ExUnit: `test/test_helper.exs`, DSL compile tests, runner tests dengan fake cog + `:cmd`/`:elixir` (tanpa network).
 - [x] A5 Fix B5 (map failure), B9 (unused alias), B10 (warning ctx), B18 (double wrap), B19/B20 (error jelas utk unknown type/name).
@@ -43,7 +43,7 @@ Gate: `mix compile` bersih + `mix test` hijau + acceptance §4.A. **PASSED** —
 - [x] B4 `repeat` (max_iterations guard, final output diteruskan, `break!`).
 - [x] B5 Kebijakan namespacing output nested (child context terisolasi, akses via `from`/`collect`/`reduce`).
 
-Gate: acceptance §4.B hijau. **PASSED** — 38 tests termasuk E2E `mix roast.execute examples/local_pipeline.exs`.
+Gate: acceptance §4.B hijau. **PASSED** — 38 tests termasuk E2E `mix sanad.execute examples/local_pipeline.exs`.
 
 ## Slice C — cog parity
 
@@ -52,12 +52,12 @@ Gate: acceptance §4.B hijau. **PASSED** — 38 tests termasuk E2E `mix roast.ex
 - [x] C3 Agent: `cd` = workflow_dir, model/system-prompt/flags, missing-binary UX, prompt via stdin (pi/claude) + argv (opencode/agy), parser JSON protocol pi/claude.
 - [x] C4 Config: resolusi terpusat (opts › workflow config › env), validasi provider (`InvalidConfigError`).
 
-Gate: acceptance §4.C + §4.D hijau. **PASSED** — 68 tests; chat diuji via `Req.Test` (plug test-only), agent via stub CLI, cmd timeout via `RoastEx.Command`.
+Gate: acceptance §4.C + §4.D hijau. **PASSED** — 68 tests; chat diuji via `Req.Test` (plug test-only), agent via stub CLI, cmd timeout via `Sanad.Command`.
 
 ## Slice D — product polish
 
-- [x] D1 CLI: `--module` hardened (non-alnum file names), `--param key=value`, pesan error jelas; dipakai oleh `mix roast.execute` + escript `roast`.
-- [x] D2 Ringkasan run: status + durasi per cog (`RoastEx.Summary`), menggantikan inspect mentah sebagai header (inspect tetap dicetak). Penuh EventMonitor belum.
+- [x] D1 CLI: `--module` hardened (non-alnum file names), `--param key=value`, pesan error jelas; dipakai oleh `mix sanad.execute` + escript `sanad`.
+- [x] D2 Ringkasan run: status + durasi per cog (`Sanad.Summary`), menggantikan inspect mentah sebagai header (inspect tetap dicetak). Penuh EventMonitor belum.
 - [x] D3 Port 2 contoh upstream: `examples/control_flow.exs` (tutorial 05) dan `examples/reusable_scopes.exs` (tutorial 06) + E2E.
 - [x] D4 Update README status table + API final + divergensi.
 

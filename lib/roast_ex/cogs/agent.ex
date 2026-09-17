@@ -1,6 +1,7 @@
 defmodule RoastEx.Cogs.Agent do
   @moduledoc """
-  Local coding-agent cog. Shells out to `pi` or `claude` CLI, matching Roast.
+  Local coding-agent cog. Shells out to `pi`, `claude`, `opencode`, or `agy`
+  CLI, matching Roast.
   """
 
   alias RoastEx.Output.Agent
@@ -13,6 +14,8 @@ defmodule RoastEx.Cogs.Agent do
       case provider do
         :claude -> {"claude", ["-p", prompt]}
         :pi -> {"pi", [prompt]}
+        :opencode -> {"opencode", ["run", prompt]}
+        :agy -> {"agy", ["-p", prompt]}
         other -> raise "Unsupported agent provider: #{inspect(other)}"
       end
 
@@ -32,6 +35,8 @@ defmodule RoastEx.Cogs.Agent do
   defp default_provider do
     case System.get_env("ROAST_DEFAULT_AGENT_PROVIDER") do
       "claude" -> :claude
+      "opencode" -> :opencode
+      "agy" -> :agy
       _ -> :pi
     end
   end

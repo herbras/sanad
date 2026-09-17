@@ -19,7 +19,28 @@ defmodule RoastEx.Output do
   end
 
   defmodule MapResult do
-    @moduledoc "Output of the (transitional) map cog."
-    defstruct items: []
+    @moduledoc """
+    Output of the map cog.
+
+    `items` holds each iteration's final output (in input order, `nil` for
+    iterations that never ran); `contexts` holds the matching child contexts.
+    """
+    defstruct items: [], contexts: []
+  end
+
+  defmodule Call do
+    @moduledoc """
+    Output of the call cog: the named scope's final output plus the child
+    context, for use with `from/2`.
+    """
+    defstruct [:scope, :index, :value, :context]
+  end
+
+  defmodule Repeat do
+    @moduledoc """
+    Output of the repeat cog: each iteration's final output plus child contexts.
+    `value` is the final iteration's output.
+    """
+    defstruct [:scope, :value, results: [], contexts: []]
   end
 end

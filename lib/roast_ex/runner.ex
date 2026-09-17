@@ -54,6 +54,52 @@ defmodule RoastEx.Runner do
     end)
   end
 
+  @doc """
+  Runs a named `execute :scope` block in an isolated child context.
+
+  The child context starts with empty outputs/statuses, inherits config,
+  params, workflow_dir and module, and carries `scope_value` / `scope_index`.
+
+  Returns `{final_output, child_ctx, control}` where `final_output` is the last
+  step's output (nil when the scope was skipped/ended early), matching
+  upstream Roast's default final output.
+  """
+  @spec run_scope(Context.t(), atom(), term(), non_neg_integer()) ::
+          {term(), Context.t(), control()}
+  def run_scope(%Context{} = parent, scope, value, index \\ 0) when is_atom(scope) do
+    steps = fetch_scope!(parent, scope)
+
+    child = %{
+      parent
+      | outputs: %{},
+        statuses: %{},
+        failures: %{},
+        scope_value: value,
+        scope_index: index
+    }
+
+    {ctx, control} = run_steps(steps, child)
+    {final_output(steps, ctx), ctx, control}
+  end
+
+  defp fetch_scope!(%Context{module: nil}, scope) do
+    raise RoastEx.UnknownScopeError, scope: scope, module: nil
+  end
+
+  defp fetch_scope!(%Context{module: module}, scope) do
+    case Map.get(module.__roast_scopes__(), scope) do
+      nil -> raise RoastEx.UnknownScopeError, scope: scope, module: module
+      steps -> steps
+    end
+  end
+
+  defp final_output(steps, ctx) do
+    case List.last(steps) do
+      nil -> nil
+      %{name: name} -> Map.get(ctx.outputs, name)
+    end
+  end
+
   defp execute_step(%{type: type, name: name, opts: opts, fun: fun}, ctx) do
     opts = normalize_opts(opts)
 

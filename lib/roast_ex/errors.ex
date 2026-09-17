@@ -40,6 +40,21 @@ defmodule RoastEx.UnknownCogError do
   end
 end
 
+defmodule RoastEx.UnknownScopeError do
+  @moduledoc "Raised when call/map/repeat references a scope that is not defined."
+  defexception [:scope, :module]
+
+  def message(%{scope: scope, module: module}) do
+    defined =
+      case module do
+        nil -> []
+        mod -> mod.__roast_scopes__() |> Map.keys() |> Kernel.--([nil])
+      end
+
+    "unknown execution scope #{inspect(scope)} (defined scopes: #{inspect(defined)})"
+  end
+end
+
 defmodule RoastEx.MissingEnvError do
   @moduledoc "Raised when a required environment variable is missing."
   defexception [:name, :hint]

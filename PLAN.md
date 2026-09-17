@@ -37,13 +37,13 @@ Gate: `mix compile` bersih + `mix test` hijau + acceptance §4.A. **PASSED** —
 
 ## Slice B — nested engine
 
-- [ ] B1 `execute :scope do` — named scopes, banyak scope per modul.
-- [ ] B2 `call` system cog (+ accessor `from` untuk output dalam).
-- [ ] B3 `map` (serial + parallel(n)) dengan nested steps; scope value/index; `collect`/`reduce`; hasil urut + `nil` gap.
-- [ ] B4 `repeat` (max_iterations guard, final output diteruskan, `break!`).
-- [ ] B5 Kebijakan namespacing output nested (child context terisolasi, akses via `from`/`collect`/`reduce`).
+- [x] B1 `execute :scope do` — named scopes, banyak scope per modul.
+- [x] B2 `call` system cog (+ accessor `from` untuk output dalam).
+- [x] B3 `map` (serial + parallel(n)) dengan nested steps; scope value/index; `collect`/`reduce`; hasil urut + `nil` gap.
+- [x] B4 `repeat` (max_iterations guard, final output diteruskan, `break!`).
+- [x] B5 Kebijakan namespacing output nested (child context terisolasi, akses via `from`/`collect`/`reduce`).
 
-Gate: acceptance §4.B hijau (termasuk test namespacing + infinite-loop guard).
+Gate: acceptance §4.B hijau. **PASSED** — 38 tests termasuk E2E `mix roast.execute examples/local_pipeline.exs`.
 
 ## Slice C — cog parity
 

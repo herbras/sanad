@@ -108,7 +108,9 @@ defmodule RoastEx.DSL do
         {:agent, :agent},
         {:elixir_cog, :elixir},
         {:ruby, :elixir},
-        {:map_cog, :map}
+        {:map_cog, :map},
+        {:call_cog, :call},
+        {:repeat_cog, :repeat}
       ] do
     defmacro unquote(dsl_name)(step_name, prompt_or_opts) do
       case split_do(prompt_or_opts) do

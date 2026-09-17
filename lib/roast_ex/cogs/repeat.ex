@@ -1,0 +1,104 @@
+defmodule RoastEx.Cogs.Repeat do
+  @moduledoc """
+  Runs a named `execute :scope` block repeatedly.
+
+      execute do
+        repeat_cog :counter, scope: :count_up, max_iterations: 10 do
+          0
+        end
+      end
+
+      execute :count_up do
+        elixir_cog :step do
+          value = ctx.scope_value
+          if value >= 3, do: break!(value)
+          value + 1
+        end
+      end
+
+  The step block supplies the first iteration's `scope_value`; each iteration's
+  final output becomes the next iteration's `scope_value` (upstream Roast
+  semantics). The output is `%RoastEx.Output.Repeat{}` with `results` (one final
+  output per iteration, `nil` for the iteration that called `break!`) and the
+  matching child `contexts`.
+
+  Options:
+
+  * `:scope` — required.
+  * `:max_iterations` — loop guard; defaults to `1000`. Use `:infinity` to
+    disable (upstream Roast has no guard at all).
+  """
+
+  alias RoastEx.Runner
+  alias RoastEx.Cogs.Nested
+  alias RoastEx.Output.Repeat
+
+  @default_max_iterations 1000
+
+  def run(value, opts, ctx) do
+    scope = Nested.scope!(:repeat, opts)
+    max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    validate_max_iterations!(max_iterations)
+
+    results =
+      Enum.reverse(loop(ctx, scope, value, 0, max_iterations, []))
+
+    {iteration_outputs, contexts} = unzip_pairs(results)
+
+    %Repeat{
+      scope: scope,
+      results: iteration_outputs,
+      contexts: contexts,
+      value: List.last(iteration_outputs)
+    }
+  end
+
+  @doc "Returns all iteration outputs."
+  def collect(%Repeat{results: results}), do: results
+  def collect(%Repeat{results: results}, fun) when is_function(fun, 1), do: Enum.map(results, fun)
+
+  @doc "Runs `fun` with each iteration's child context (`nil` stays `nil`)."
+  def from(%Repeat{contexts: contexts}, fun) when is_function(fun, 1) do
+    Enum.map(contexts, fn
+      nil -> nil
+      child_ctx -> fun.(child_ctx)
+    end)
+  end
+
+  @doc "Reduces over non-nil iteration outputs."
+  def reduce(%Repeat{results: results}, acc, fun) when is_function(fun, 2) do
+    results
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reduce(acc, fun)
+  end
+
+  @doc "Returns the output of a specific iteration."
+  def iteration(%Repeat{results: results}, index), do: Enum.at(results, index)
+
+  defp loop(_ctx, _scope, _value, index, max, acc)
+       when is_integer(max) and index >= max do
+    acc
+  end
+
+  defp loop(ctx, scope, value, index, max, acc) do
+    {final_output, child_ctx, control} = Runner.run_scope(ctx, scope, value, index)
+    acc = [{final_output, child_ctx} | acc]
+
+    case control do
+      :break -> acc
+      _ -> loop(ctx, scope, final_output, index + 1, max, acc)
+    end
+  end
+
+  defp validate_max_iterations!(:infinity), do: :ok
+
+  defp validate_max_iterations!(max) when is_integer(max) and max > 0, do: :ok
+
+  defp validate_max_iterations!(other) do
+    raise ArgumentError,
+          "repeat :max_iterations must be a positive integer or :infinity, got: #{inspect(other)}"
+  end
+
+  defp unzip_pairs([]), do: {[], []}
+  defp unzip_pairs(pairs), do: Enum.unzip(pairs)
+end

@@ -12,7 +12,9 @@ defmodule RoastEx.Cog.Registry do
     chat: RoastEx.Cogs.Chat,
     agent: RoastEx.Cogs.Agent,
     elixir: RoastEx.Cogs.ElixirCog,
-    map: RoastEx.Cogs.Map
+    map: RoastEx.Cogs.Map,
+    call: RoastEx.Cogs.Call,
+    repeat: RoastEx.Cogs.Repeat
   }
 
   @type cog_type :: atom()

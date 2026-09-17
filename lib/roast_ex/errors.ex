@@ -65,3 +65,50 @@ defmodule RoastEx.MissingEnvError do
     "missing environment variable #{name} — #{hint}"
   end
 end
+
+defmodule RoastEx.InvalidConfigError do
+  @moduledoc "Raised when workflow/cog configuration is invalid."
+  defexception [:message]
+end
+
+defmodule RoastEx.ChatError do
+  @moduledoc "Raised when a chat provider request fails."
+  defexception [:provider, :status, :body, :reason]
+
+  def message(%{provider: provider, status: status, body: body}) when is_integer(status) do
+    "chat provider #{inspect(provider)} returned HTTP #{status}: #{inspect(body)}"
+  end
+
+  def message(%{provider: provider, reason: reason}) do
+    "chat provider #{inspect(provider)} request failed: #{inspect(reason)}"
+  end
+end
+
+defmodule RoastEx.AgentError do
+  @moduledoc "Raised when an agent CLI invocation fails."
+  defexception [:provider, :reason]
+
+  def message(%{provider: provider, reason: reason}) do
+    "agent provider #{inspect(provider)} #{reason}"
+  end
+end
+
+defmodule RoastEx.MissingExecutableError do
+  @moduledoc "Raised when a required external binary is not on PATH."
+  defexception [:name, :hint]
+
+  def message(%{name: name, hint: nil}), do: "executable #{inspect(name)} not found on PATH"
+
+  def message(%{name: name, hint: hint}) do
+    "executable #{inspect(name)} not found on PATH — #{hint}"
+  end
+end
+
+defmodule RoastEx.CommandTimeoutError do
+  @moduledoc "Raised when an external command exceeds its timeout."
+  defexception [:command, :timeout, :stdout, :stderr]
+
+  def message(%{command: command, timeout: timeout}) do
+    "command timed out after #{inspect(timeout)}ms: #{command}"
+  end
+end

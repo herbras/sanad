@@ -47,12 +47,12 @@ Gate: acceptance §4.B hijau. **PASSED** — 38 tests termasuk E2E `mix roast.ex
 
 ## Slice C — cog parity
 
-- [ ] C1 Cmd: `cwd`, `env`, `timeout`, stderr terpisah, `fail_on_error` (default true).
-- [ ] C2 Chat: status-code check, error jelas utk API key hilang, retry `:transient`, timeout, params `temperature`/`system_prompt`/`max_tokens`, provider Perplexity.
-- [ ] C3 Agent: `cd` = workflow_dir, model/system-prompt/flags, missing-binary UX, prompt via stdin.
-- [ ] C4 Config: `RoastEx.Config` terpusat (global + per-cog override), validasi provider, normalisasi keyword/map.
+- [x] C1 Cmd: `cwd`, `env`, `timeout`, stderr terpisah, `fail_on_error` (default true).
+- [x] C2 Chat: status-code check, error jelas utk API key hilang, retry `:transient`, timeout, params `temperature`/`system_prompt`/`max_tokens`, provider Perplexity + config `base_url`/`api_key`/`key_env`.
+- [x] C3 Agent: `cd` = workflow_dir, model/system-prompt/flags, missing-binary UX, prompt via stdin (pi/claude) + argv (opencode/agy), parser JSON protocol pi/claude.
+- [x] C4 Config: resolusi terpusat (opts › workflow config › env), validasi provider (`InvalidConfigError`).
 
-Gate: acceptance §4.C + §4.D hijau.
+Gate: acceptance §4.C + §4.D hijau. **PASSED** — 68 tests; chat diuji via `Req.Test` (plug test-only), agent via stub CLI, cmd timeout via `RoastEx.Command`.
 
 ## Slice D — product polish
 

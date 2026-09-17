@@ -1,44 +1,94 @@
 defmodule RoastEx.Cogs.Chat do
   @moduledoc """
-  Cloud LLM cog. Supports :openai, :anthropic, :gemini via HTTP.
+  Cloud LLM cog with OpenAI, Anthropic, Gemini and Perplexity providers.
 
-  API keys (env fallback): OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY.
-  Base URLs (env fallback): OPENAI_API_BASE, ANTHROPIC_API_BASE, GEMINI_API_BASE.
+  ## Providers and credentials
 
-  Any OpenAI-compatible endpoint works via :openai + `base_url`, e.g.
-  OpenRouter (`https://openrouter.ai/api/v1`) or Cloudflare Workers AI
-  (`https://api.cloudflare.com/client/v4/accounts/<id>/ai/v1`).
+  | provider | default key env | default base URL env |
+  |---|---|---|
+  | `:openai` | `OPENAI_API_KEY` | `OPENAI_API_BASE` |
+  | `:anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_BASE` |
+  | `:gemini` | `GEMINI_API_KEY` | `GEMINI_API_BASE` |
+  | `:perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_API_BASE` |
 
-  Per-workflow overrides in config (so OpenRouter and CF can coexist):
+  Any OpenAI-compatible endpoint works via `:openai` + `:base_url`, e.g.
+  OpenRouter (`https://openrouter.ai/api/v1`) or Cloudflare Workers AI.
+  Per-workflow overrides (config) let endpoints coexist:
 
       config do
         %{chat: %{provider: :openai, model: "deepseek/deepseek-v4-flash",
                  base_url: "https://openrouter.ai/api/v1", key_env: "OPENROUTER_API_KEY"}}
       end
 
-  Supported override keys: `:base_url`, `:api_key` (literal), `:key_env`
-  (name of the env var holding the key).
+  Resolution order: step opts › workflow config › env vars.
+
+  ## Options
+
+  * `:provider` — defaults to `ROAST_DEFAULT_CHAT_PROVIDER` or `:openai`
+  * `:model`
+  * `:system_prompt`, `:temperature`, `:max_tokens`
+  * `:api_key` (literal), `:key_env` (env var name), `:base_url`
+  * `:timeout` — request receive timeout in ms (default `60_000`)
+  * `:max_retries` — default 3 (POST requests are retried with
+    `retry: :transient`)
+  * `:req_options` — extra `Req` options, e.g. `plug: {Req.Test, Name}` in tests
+
+  Failures raise `RoastEx.ChatError`; missing keys raise
+  `RoastEx.MissingEnvError`; invalid providers `RoastEx.InvalidConfigError`.
   """
 
+  alias RoastEx.Config
   alias RoastEx.Output.Chat
 
-  def run(prompt, opts, ctx) when is_binary(prompt) do
-    chat_cfg = Map.get(ctx.config, :chat, %{})
-    provider = Keyword.get(opts, :provider) || Map.get(chat_cfg, :provider, default_provider())
-    model = Keyword.get(opts, :model) || Map.get(chat_cfg, :model) || default_model(provider)
+  @providers [:openai, :anthropic, :gemini, :perplexity]
 
-    body = request(provider, model, prompt, chat_cfg, opts)
-    %Chat{response: body, model: model, provider: provider, raw: %{}}
+  def run(prompt, opts, ctx) when is_binary(prompt) do
+    cfg = Map.get(ctx.config, :chat, %{})
+    provider = provider(opts, cfg)
+    model = Keyword.get(opts, :model) || Map.get(cfg, :model) || default_model(provider)
+    request = build_request(provider, model, prompt, opts, cfg)
+
+    options =
+      [
+        headers: request.headers,
+        json: request.body,
+        retry: :transient,
+        max_retries: Keyword.get(opts, :max_retries, 3),
+        receive_timeout: Keyword.get(opts, :timeout, 60_000)
+      ] ++ Keyword.get(opts, :req_options, [])
+
+    case Req.post(request.url, options) do
+      {:ok, %{status: status, body: body}} when status in 200..299 ->
+        %Chat{response: extract_text(provider, body), model: model, provider: provider, raw: body}
+
+      {:ok, %{status: status, body: body}} ->
+        raise RoastEx.ChatError, provider: provider, status: status, body: body
+
+      {:error, reason} ->
+        raise RoastEx.ChatError, provider: provider, reason: reason
+    end
   end
 
   def run(other, _opts, _ctx) do
     raise ArgumentError, "chat expects a prompt string, got: #{inspect(other)}"
   end
 
+  defp provider(opts, cfg) do
+    provider = Keyword.get(opts, :provider) || Map.get(cfg, :provider) || default_provider()
+
+    if provider in @providers do
+      provider
+    else
+      raise RoastEx.InvalidConfigError,
+        message: "chat provider must be one of #{inspect(@providers)}, got: #{inspect(provider)}"
+    end
+  end
+
   defp default_provider do
     case System.get_env("ROAST_DEFAULT_CHAT_PROVIDER") do
       "anthropic" -> :anthropic
       "gemini" -> :gemini
+      "perplexity" -> :perplexity
       _ -> :openai
     end
   end
@@ -46,79 +96,140 @@ defmodule RoastEx.Cogs.Chat do
   defp default_model(:openai), do: "gpt-4o-mini"
   defp default_model(:anthropic), do: "claude-haiku-4-5"
   defp default_model(:gemini), do: "gemini-2.0-flash"
-  defp default_model(_), do: "gpt-4o-mini"
+  defp default_model(:perplexity), do: "sonar"
 
-  defp request(:openai, model, prompt, cfg, opts) do
-    key = api_key(cfg, opts, :openai)
-    base = base_url(cfg, opts, "OPENAI_API_BASE", "https://api.openai.com/v1")
+  # --- per-provider request building ---------------------------------------
 
-    {:ok, resp} =
-      Req.post(base <> "/chat/completions",
-        auth: {:bearer, key},
-        json: %{
+  defp build_request(provider, model, prompt, opts, cfg)
+       when provider in [:openai, :perplexity] do
+    key = api_key(opts, cfg, provider)
+    base = base_url(opts, cfg, provider)
+
+    %{
+      url: base <> "/chat/completions",
+      headers: [{"authorization", "Bearer " <> key}],
+      body:
+        %{model: model, messages: openai_messages(prompt, opts, cfg)}
+        |> put_if_present(:temperature, param(opts, cfg, :temperature))
+        |> put_if_present(:max_tokens, param(opts, cfg, :max_tokens))
+    }
+  end
+
+  defp build_request(:anthropic, model, prompt, opts, cfg) do
+    key = api_key(opts, cfg, :anthropic)
+    base = base_url(opts, cfg, :anthropic)
+
+    %{
+      url: base <> "/v1/messages",
+      headers: [{"x-api-key", key}, {"anthropic-version", "2023-06-01"}],
+      body:
+        %{
           model: model,
+          max_tokens: param(opts, cfg, :max_tokens) || 4096,
           messages: [%{role: "user", content: prompt}]
         }
+        |> put_if_present(:temperature, param(opts, cfg, :temperature))
+        |> put_if_present(:system, system_prompt(opts, cfg))
+    }
+  end
+
+  defp build_request(:gemini, model, prompt, opts, cfg) do
+    key = api_key(opts, cfg, :gemini)
+    base = base_url(opts, cfg, :gemini)
+
+    generation_config =
+      %{}
+      |> put_if_present(:temperature, param(opts, cfg, :temperature))
+      |> put_if_present(:maxOutputTokens, param(opts, cfg, :max_tokens))
+
+    body =
+      %{contents: [%{parts: [%{text: prompt}]}]}
+      |> put_if_present(
+        :generationConfig,
+        if(generation_config == %{}, do: nil, else: generation_config)
       )
+      |> put_if_present(:systemInstruction, gemini_system_instruction(opts, cfg))
 
-    get_in(resp.body, ["choices", Access.at(0), "message", "content"]) || inspect(resp.body)
+    %{
+      url: base <> "/models/#{model}:generateContent",
+      headers: [{"x-goog-api-key", key}],
+      body: body
+    }
   end
 
-  defp request(:anthropic, model, prompt, cfg, opts) do
-    key = api_key(cfg, opts, :anthropic)
-    base = base_url(cfg, opts, "ANTHROPIC_API_BASE", "https://api.anthropic.com")
+  defp api_key(opts, cfg, provider) do
+    hint = "set #{default_key_env(provider)} or configure chat :key_env / :api_key"
 
-    {:ok, resp} =
-      Req.post(base <> "/v1/messages",
-        headers: [
-          {"x-api-key", key},
-          {"anthropic-version", "2023-06-01"}
-        ],
-        json: %{
-          model: model,
-          max_tokens: 2048,
-          messages: [%{role: "user", content: prompt}]
-        }
-      )
-
-    case get_in(resp.body, ["content", Access.at(0), "text"]) do
-      nil -> inspect(resp.body)
-      text -> text
-    end
-  end
-
-  defp request(:gemini, model, prompt, cfg, opts) do
-    key = api_key(cfg, opts, :gemini)
-
-    base =
-      base_url(cfg, opts, "GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
-
-    url = "#{base}/models/#{model}:generateContent?key=#{key}"
-
-    {:ok, resp} =
-      Req.post(url,
-        json: %{contents: [%{parts: [%{text: prompt}]}]}
-      )
-
-    get_in(resp.body, ["candidates", Access.at(0), "content", "parts", Access.at(0), "text"]) ||
-      inspect(resp.body)
-  end
-
-  defp request(other, _model, _prompt, _cfg, _opts) do
-    raise "Unsupported chat provider: #{inspect(other)}"
-  end
-
-  defp api_key(cfg, opts, provider) do
     cond do
-      k = Keyword.get(opts, :api_key) -> k
-      k = Map.get(cfg, :api_key) -> k
-      env = Keyword.get(opts, :key_env) || Map.get(cfg, :key_env) -> System.fetch_env!(env)
-      true -> System.fetch_env!("#{provider |> Atom.to_string() |> String.upcase()}_API_KEY")
+      key = Keyword.get(opts, :api_key) -> key
+      key = Map.get(cfg, :api_key) -> key
+      env = Keyword.get(opts, :key_env) || Map.get(cfg, :key_env) -> Config.fetch_env!(env, hint)
+      true -> Config.fetch_env!(default_key_env(provider), hint)
     end
   end
 
-  defp base_url(cfg, opts, env_var, default) do
+  defp default_key_env(:openai), do: "OPENAI_API_KEY"
+  defp default_key_env(:anthropic), do: "ANTHROPIC_API_KEY"
+  defp default_key_env(:gemini), do: "GEMINI_API_KEY"
+  defp default_key_env(:perplexity), do: "PERPLEXITY_API_KEY"
+
+  defp base_url(opts, cfg, provider) do
+    {env_var, default} = default_base_url(provider)
+
     Keyword.get(opts, :base_url) || Map.get(cfg, :base_url) ||
       System.get_env(env_var) || default
+  end
+
+  defp default_base_url(:openai), do: {"OPENAI_API_BASE", "https://api.openai.com/v1"}
+  defp default_base_url(:anthropic), do: {"ANTHROPIC_API_BASE", "https://api.anthropic.com"}
+  defp default_base_url(:perplexity), do: {"PERPLEXITY_API_BASE", "https://api.perplexity.ai"}
+
+  defp default_base_url(:gemini),
+    do: {"GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta"}
+
+  defp openai_messages(prompt, opts, cfg) do
+    case system_prompt(opts, cfg) do
+      nil -> [%{role: "user", content: prompt}]
+      system -> [%{role: "system", content: system}, %{role: "user", content: prompt}]
+    end
+  end
+
+  defp gemini_system_instruction(opts, cfg) do
+    case system_prompt(opts, cfg) do
+      nil -> nil
+      system -> %{parts: [%{text: system}]}
+    end
+  end
+
+  defp system_prompt(opts, cfg) do
+    Keyword.get(opts, :system_prompt) || Map.get(cfg, :system_prompt)
+  end
+
+  defp param(opts, cfg, key) do
+    Keyword.get(opts, key) || Map.get(cfg, key)
+  end
+
+  defp put_if_present(map, _key, nil), do: map
+  defp put_if_present(map, key, value), do: Map.put(map, key, value)
+
+  # --- response extraction --------------------------------------------------
+
+  defp extract_text(provider, %{"choices" => [%{"message" => %{"content" => content}} | _]})
+       when provider in [:openai, :perplexity] and is_binary(content),
+       do: content
+
+  defp extract_text(:anthropic, %{"content" => [%{"text" => text} | _]}) when is_binary(text),
+    do: text
+
+  defp extract_text(:gemini, %{
+         "candidates" => [%{"content" => %{"parts" => [%{"text" => text} | _]}} | _]
+       })
+       when is_binary(text),
+       do: text
+
+  defp extract_text(provider, body) do
+    raise RoastEx.ChatError,
+      provider: provider,
+      reason: "could not extract text from response: #{inspect(body)}"
   end
 end

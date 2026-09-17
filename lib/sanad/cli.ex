@@ -16,10 +16,20 @@ defmodule Sanad.CLI do
       OptionParser.parse(args, strict: [module: :string, param: :keep, help: :boolean])
 
     cond do
-      opts[:help] -> print_usage()
-      invalid != [] -> usage_error("unknown option(s): " <> option_names(invalid))
-      rest == [] -> usage_error(nil)
-      true -> execute(hd(rest), opts)
+      opts[:help] ->
+        print_usage()
+
+      invalid != [] ->
+        usage_error("unknown option(s): " <> option_names(invalid))
+
+      rest == [] ->
+        usage_error(nil)
+
+      match?([_, _ | _], rest) ->
+        usage_error("expected exactly one workflow file, got: #{inspect(rest)}")
+
+      true ->
+        execute(hd(rest), opts)
     end
   end
 

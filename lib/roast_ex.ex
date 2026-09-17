@@ -36,9 +36,17 @@ defmodule Sanad do
   """
   @spec guess_module(Path.t()) :: String.t()
   def guess_module(path) do
-    path
-    |> Path.basename(".exs")
-    |> String.replace(~r/[^A-Za-z0-9_]+/, "_")
-    |> Macro.camelize()
+    base =
+      path
+      |> Path.basename(".exs")
+      |> String.replace(~r/[^A-Za-z0-9_]+/, "_")
+      |> Macro.camelize()
+
+    if base == "" or not String.match?(base, ~r/^[A-Z]/) do
+      raise ArgumentError,
+            "cannot infer module name from #{inspect(path)}; pass --module explicitly"
+    end
+
+    base
   end
 end

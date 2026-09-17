@@ -55,7 +55,18 @@ defmodule Sanad.Command do
     after
       timeout ->
         terminate(port)
+        drain_port(port)
         {:timeout, IO.iodata_to_binary(acc)}
+    end
+  end
+
+  # A killed port may still deliver `{port, {:exit_status, _}}`; consume any
+  # pending port messages so they do not leak into the caller's mailbox.
+  defp drain_port(port) do
+    receive do
+      {^port, _message} -> drain_port(port)
+    after
+      20 -> :ok
     end
   end
 

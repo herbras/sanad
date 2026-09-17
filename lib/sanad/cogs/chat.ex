@@ -85,17 +85,42 @@ defmodule Sanad.Cogs.Chat do
   end
 
   defp default_provider do
-    case System.get_env("SANAD_DEFAULT_CHAT_PROVIDER") do
-      "anthropic" -> :anthropic
-      "gemini" -> :gemini
-      "perplexity" -> :perplexity
-      _ -> :openai
+    case normalize_provider(System.get_env("SANAD_DEFAULT_CHAT_PROVIDER")) do
+      nil ->
+        :openai
+
+      "openai" ->
+        :openai
+
+      "anthropic" ->
+        :anthropic
+
+      "gemini" ->
+        :gemini
+
+      "perplexity" ->
+        :perplexity
+
+      other ->
+        raise Sanad.InvalidConfigError,
+          message:
+            "invalid SANAD_DEFAULT_CHAT_PROVIDER: #{inspect(other)} " <>
+              "(expected openai | anthropic | gemini | perplexity)"
+    end
+  end
+
+  defp normalize_provider(nil), do: nil
+
+  defp normalize_provider(value) do
+    case value |> String.trim() |> String.downcase() do
+      "" -> nil
+      normalized -> normalized
     end
   end
 
   defp default_model(:openai), do: "gpt-4o-mini"
   defp default_model(:anthropic), do: "claude-haiku-4-5"
-  defp default_model(:gemini), do: "gemini-2.0-flash"
+  defp default_model(:gemini), do: "gemini-3.1-flash-lite"
   defp default_model(:perplexity), do: "sonar"
 
   # --- per-provider request building ---------------------------------------
@@ -176,8 +201,9 @@ defmodule Sanad.Cogs.Chat do
   defp base_url(opts, cfg, provider) do
     {env_var, default} = default_base_url(provider)
 
-    Keyword.get(opts, :base_url) || Map.get(cfg, :base_url) ||
-      System.get_env(env_var) || default
+    (Keyword.get(opts, :base_url) || Map.get(cfg, :base_url) ||
+       System.get_env(env_var) || default)
+    |> String.trim_trailing("/")
   end
 
   defp default_base_url(:openai), do: {"OPENAI_API_BASE", "https://api.openai.com/v1"}
@@ -218,8 +244,20 @@ defmodule Sanad.Cogs.Chat do
        when provider in [:openai, :perplexity] and is_binary(content),
        do: content
 
-  defp extract_text(:anthropic, %{"content" => [%{"text" => text} | _]}) when is_binary(text),
-    do: text
+  defp extract_text(:anthropic, %{"content" => content}) when is_list(content) do
+    case Enum.find_value(content, fn
+           %{"type" => "text", "text" => text} when is_binary(text) -> text
+           _ -> nil
+         end) do
+      nil ->
+        raise Sanad.ChatError,
+          provider: :anthropic,
+          reason: "no text block in response: #{inspect(content)}"
+
+      text ->
+        text
+    end
+  end
 
   defp extract_text(:gemini, %{
          "candidates" => [%{"content" => %{"parts" => [%{"text" => text} | _]}} | _]

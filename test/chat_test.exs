@@ -5,7 +5,7 @@ defmodule Sanad.Cogs.ChatTest do
 
   @env_vars ~w(
     OPENAI_API_KEY ANTHROPIC_API_KEY GEMINI_API_KEY PERPLEXITY_API_KEY
-    OPENROUTER_TEST_KEY OPENAI_API_BASE
+    OPENROUTER_TEST_KEY OPENAI_API_BASE SANAD_DEFAULT_CHAT_PROVIDER
   )
 
   setup do
@@ -150,6 +150,27 @@ defmodule Sanad.Cogs.ChatTest do
   test "unknown provider raises InvalidConfigError" do
     assert_raise Sanad.InvalidConfigError, ~r/provider/, fn ->
       run_chat("hi", provider: :bogus)
+    end
+  end
+
+  test "SANAD_DEFAULT_CHAT_PROVIDER is normalized and selects the provider" do
+    System.put_env("SANAD_DEFAULT_CHAT_PROVIDER", "ANTHROPIC")
+
+    Req.Test.stub(:env_chat_provider, fn conn ->
+      Req.Test.json(conn, %{"content" => [%{"type" => "text", "text" => "from anthropic"}]})
+    end)
+
+    out = run_chat("hi", req_options: [plug: {Req.Test, :env_chat_provider}])
+
+    assert out.provider == :anthropic
+    assert out.response == "from anthropic"
+  end
+
+  test "invalid SANAD_DEFAULT_CHAT_PROVIDER raises a clear error" do
+    System.put_env("SANAD_DEFAULT_CHAT_PROVIDER", "bogus")
+
+    assert_raise Sanad.InvalidConfigError, ~r/invalid SANAD_DEFAULT_CHAT_PROVIDER/, fn ->
+      run_chat("hi", [])
     end
   end
 end

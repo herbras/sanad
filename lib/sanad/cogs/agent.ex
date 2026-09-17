@@ -32,8 +32,9 @@ defmodule Sanad.Cogs.Agent do
   @providers [:pi, :claude, :opencode, :agy]
 
   def run(prompt, opts, ctx) when is_binary(prompt) do
-    provider = provider(opts, ctx)
-    [binary | base_args] = command(provider, opts, ctx)
+    opts = Keyword.merge(agent_config(ctx), opts)
+    provider = provider(opts)
+    [binary | base_args] = command(provider, opts)
     {args, input} = invocation(provider, base_args, prompt, opts)
     validate_executable!(binary, provider)
 
@@ -70,11 +71,8 @@ defmodule Sanad.Cogs.Agent do
     raise ArgumentError, "agent expects a prompt string, got: #{inspect(other)}"
   end
 
-  defp provider(opts, ctx) do
-    provider =
-      Keyword.get(opts, :provider) ||
-        get_in_config(ctx, [:agent, :provider]) ||
-        default_provider()
+  defp provider(opts) do
+    provider = Keyword.get(opts, :provider) || default_provider()
 
     if provider in @providers do
       provider
@@ -85,16 +83,41 @@ defmodule Sanad.Cogs.Agent do
   end
 
   defp default_provider do
-    case System.get_env("SANAD_DEFAULT_AGENT_PROVIDER") do
-      "claude" -> :claude
-      "opencode" -> :opencode
-      "agy" -> :agy
-      _ -> :pi
+    case normalize_provider(System.get_env("SANAD_DEFAULT_AGENT_PROVIDER")) do
+      nil ->
+        :pi
+
+      "pi" ->
+        :pi
+
+      "claude" ->
+        :claude
+
+      "opencode" ->
+        :opencode
+
+      "agy" ->
+        :agy
+
+      other ->
+        raise Sanad.InvalidConfigError,
+          message:
+            "invalid SANAD_DEFAULT_AGENT_PROVIDER: #{inspect(other)} " <>
+              "(expected pi | claude | opencode | agy)"
     end
   end
 
-  defp command(provider, opts, ctx) do
-    case Keyword.get(opts, :command) || get_in_config(ctx, [:agent, :command]) do
+  defp normalize_provider(nil), do: nil
+
+  defp normalize_provider(value) do
+    case value |> String.trim() |> String.downcase() do
+      "" -> nil
+      normalized -> normalized
+    end
+  end
+
+  defp command(provider, opts) do
+    case Keyword.get(opts, :command) do
       nil ->
         default_command(provider)
 
@@ -151,8 +174,17 @@ defmodule Sanad.Cogs.Agent do
 
     args =
       case Keyword.get(opts, :session) do
-        nil -> args
-        session -> args ++ ["--resume", session]
+        nil ->
+          args
+
+        session ->
+          args = args ++ ["--resume", session]
+
+          if Keyword.get(opts, :fork_session, true) do
+            args ++ ["--fork-session"]
+          else
+            args
+          end
       end
 
     if Keyword.get(opts, :skip_permissions, false) do
@@ -287,5 +319,9 @@ defmodule Sanad.Cogs.Agent do
     end)
   end
 
-  defp get_in_config(%Context{config: config}, path), do: get_in(config, path)
+  defp agent_config(%Context{config: config}) do
+    config
+    |> Map.get(:agent, %{})
+    |> Enum.to_list()
+  end
 end

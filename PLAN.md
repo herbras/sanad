@@ -1,5 +1,7 @@
 # Sanad — execution plan
 
+> **STATUS: SELESAI** — Slice A–D tuntas, 77 tes hijau, `mix compile --warnings-as-errors` bersih, E2E CLI (mix task + escript) terverifikasi. Sisa opsional: tutorial 1–9, publish Hex, EventMonitor penuh.
+
 Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ## Objective / definition of done

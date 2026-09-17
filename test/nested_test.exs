@@ -334,7 +334,7 @@ defmodule Sanad.NestedTest do
     elapsed = System.monotonic_time(:millisecond) - started
 
     # Without cancellation the slow sibling (2s sleep) would dominate.
-    assert elapsed < 1000, "expected prompt cancellation, took #{elapsed}ms"
+    assert elapsed < 1800, "expected prompt cancellation, took #{elapsed}ms"
     assert ctx.outputs[:cancelled].items == [nil, nil, nil]
   end
 

@@ -32,7 +32,7 @@ BEAM sudah kuat untuk I/O paralel; itu bagian yang di Ruby harus dipasang gem as
 | Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | ✅ |
 | CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | ✅ |
 | Ringkasan run (status + durasi per cog) | ✅ |
-| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | ✅ 72 tes |
+| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | ✅ 77 tes |
 | Event monitor setara Roast (render `🔥`, block events, dst.) | ⬜ belum |
 | Scope `outputs { }` / `outputs! { }` | ⬜ belum |
 | Config per-nama/regex (`chat(:x) do …`) | ⬜ belum |
@@ -219,6 +219,8 @@ Semua tes offline:
 ## Divergensi yang didokumentasikan
 
 - `ruby` → `elixir_cog` (nilai mentah; tidak ada evaluasi string Ruby).
+- Agent satu prompt per step (upstream bisa multi-prompt & merantai sesi); `:fork_session` claude tersedia sebagai opsi (default `true` saat `:session` diisi).
+- Chat menambah `system_prompt`, `max_tokens`, `temperature`, retry/timeout, `PERPLEXITY_API_BASE`, dan override `base_url`/`api_key`/`key_env` (upstream lebih minim).
 - Belum ada `outputs { }` / `outputs! { }` untuk nilai balik scope (default: output cog terakhir).
 - Belum ada config per-nama/regex ala Roast (`chat(:x) do … end`); pakai opsi step.
 - Event rendering Roast (`🔥`, `❯`, block events) belum direplikasi; Sanad punya ringkasan run.

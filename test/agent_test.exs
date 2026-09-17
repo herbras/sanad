@@ -126,4 +126,53 @@ defmodule Sanad.Cogs.AgentTest do
       Sanad.Cogs.Agent.run("hi", [command: [stub_path], timeout: 150], ctx(dir))
     end
   end
+
+  test "SANAD_DEFAULT_AGENT_PROVIDER is normalized and selects the provider", %{dir: dir} do
+    System.put_env("SANAD_DEFAULT_AGENT_PROVIDER", "CLAUDE")
+    on_exit(fn -> System.delete_env("SANAD_DEFAULT_AGENT_PROVIDER") end)
+
+    stub_path =
+      stub(dir, "claude", """
+      cat > /dev/null
+      printf '%s\\n' '{"type":"result","subtype":"success","is_error":false,"result":"ENV CLAUDE"}'
+      """)
+
+    out = Sanad.Cogs.Agent.run("hi", [command: [stub_path]], ctx(dir))
+
+    assert out.provider == :claude
+    assert out.response == "ENV CLAUDE"
+  end
+
+  test "invalid SANAD_DEFAULT_AGENT_PROVIDER raises a clear error" do
+    System.put_env("SANAD_DEFAULT_AGENT_PROVIDER", "nope")
+    on_exit(fn -> System.delete_env("SANAD_DEFAULT_AGENT_PROVIDER") end)
+
+    assert_raise Sanad.InvalidConfigError, ~r/invalid SANAD_DEFAULT_AGENT_PROVIDER/, fn ->
+      Sanad.Cogs.Agent.run("hi", [], %Context{})
+    end
+  end
+
+  test "agent config supplies model/session defaults", %{dir: dir} do
+    stub_path =
+      stub(dir, "pi", """
+      printf '%s' "$*" > "$CAPTURE"
+      cat > /dev/null
+      printf '%s\\n' '{"type":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"OK"}]}]}'
+      """)
+
+    capture = Path.join(dir, "args.txt")
+    config = %{agent: %{model: "m1", session: "s1"}}
+
+    out =
+      Sanad.Cogs.Agent.run(
+        "hi",
+        [command: [stub_path], env: %{"CAPTURE" => capture}],
+        %Context{workflow_dir: dir, config: config}
+      )
+
+    assert out.response == "OK"
+    args = File.read!(capture)
+    assert args =~ "--model m1"
+    assert args =~ "--fork s1"
+  end
 end

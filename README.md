@@ -196,8 +196,9 @@ Setiap scope nested berjalan di `Context` anak yang terisolasi: output dalam tid
 
 ```bash
 mix roast.execute path/to/workflow.exs [--module M] [--param key=value ...]
-mix escript.build        # menghasilkan binary ./roast
-./roast path/to/workflow.exs --param key=value
+mix escript.build               # menghasilkan binary ./roast
+cp roast ~/.local/bin/roast     # taruh di PATH, pakai dari project mana pun
+roast path/to/workflow.exs --param key=value
 ```
 
 Output berisi ringkasan (status + durasi per cog) lalu inspect output lengkap. Workflow gagal → exit code non-zero dengan pesan error.

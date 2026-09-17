@@ -1,7 +1,10 @@
 defmodule RoastEx.Cogs.ElixirCog do
-  alias RoastEx.Output.Elixir
+  @moduledoc """
+  Returns the value produced by the step's input block.
 
-  def run(value, _opts \\ []) do
-    %Elixir{value: value}
-  end
+  This is RoastEx's counterpart of Roast's `ruby` cog; the DSL exposes it as
+  both `elixir_cog` and `ruby`.
+  """
+
+  def run(value, _opts, _ctx), do: value
 end

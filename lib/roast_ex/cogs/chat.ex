@@ -8,13 +8,17 @@ defmodule RoastEx.Cogs.Chat do
 
   alias RoastEx.Output.Chat
 
-  def run(prompt, opts, config) when is_binary(prompt) do
-    chat_cfg = Map.get(config, :chat, %{})
+  def run(prompt, opts, ctx) when is_binary(prompt) do
+    chat_cfg = Map.get(ctx.config, :chat, %{})
     provider = Keyword.get(opts, :provider) || Map.get(chat_cfg, :provider, default_provider())
     model = Keyword.get(opts, :model) || Map.get(chat_cfg, :model) || default_model(provider)
 
     body = request(provider, model, prompt)
     %Chat{response: body, model: model, provider: provider, raw: %{}}
+  end
+
+  def run(other, _opts, _ctx) do
+    raise ArgumentError, "chat expects a prompt string, got: #{inspect(other)}"
   end
 
   defp default_provider do

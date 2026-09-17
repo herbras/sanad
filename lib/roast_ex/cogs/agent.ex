@@ -5,8 +5,8 @@ defmodule RoastEx.Cogs.Agent do
 
   alias RoastEx.Output.Agent
 
-  def run(prompt, opts, config) when is_binary(prompt) do
-    agent_cfg = Map.get(config, :agent, %{})
+  def run(prompt, opts, ctx) when is_binary(prompt) do
+    agent_cfg = Map.get(ctx.config, :agent, %{})
     provider = Keyword.get(opts, :provider) || Map.get(agent_cfg, :provider, default_provider())
 
     {bin, args} =
@@ -23,6 +23,10 @@ defmodule RoastEx.Cogs.Agent do
     end
 
     %Agent{response: stdout, provider: provider, raw: %{status: status}}
+  end
+
+  def run(other, _opts, _ctx) do
+    raise ArgumentError, "agent expects a prompt string, got: #{inspect(other)}"
   end
 
   defp default_provider do

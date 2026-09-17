@@ -27,13 +27,13 @@ render log yang pixel-perfect.
 
 ## Slice A — foundation
 
-- [ ] A1 Fix DSL: step storage pakai generated function (hindari fun-in-attribute), `config` andal, block form `cmd`/`chat`/`agent` hidup, hilangkan arity clash & warning.
-- [ ] A2 `RoastEx.Cog` behaviour + `RoastEx.Cog.Registry` (builtin + override via application env). Runner pakai registry, bukan `case`.
-- [ ] A3 Control flow: `skip!/fail!/next!/break!` (throw), `abort_on_failure` per-step + global; status per output (`:ok/:skipped/:failed`).
-- [ ] A4 ExUnit: `test/test_helper.exs`, DSL compile tests, runner tests dengan fake cog + `:cmd`/`:elixir` (tanpa network).
-- [ ] A5 Fix B5 (map failure), B9 (unused alias), B10 (warning ctx), B18 (double wrap), B19/B20 (error jelas utk unknown type/name).
+- [x] A1 Fix DSL: step storage pakai generated function (hindari fun-in-attribute), `config` andal, block form `cmd`/`chat`/`agent` hidup, hilangkan arity clash & warning.
+- [x] A2 `RoastEx.Cog` behaviour + `RoastEx.Cog.Registry` (builtin + override via application env). Runner pakai registry, bukan `case`.
+- [x] A3 Control flow: `skip!/fail!/next!/break!` (throw), `abort_on_failure` per-step + global; status per output (`:ok/:skipped/:failed`).
+- [x] A4 ExUnit: `test/test_helper.exs`, DSL compile tests, runner tests dengan fake cog + `:cmd`/`:elixir` (tanpa network).
+- [x] A5 Fix B5 (map failure), B9 (unused alias), B10 (warning ctx), B18 (double wrap), B19/B20 (error jelas utk unknown type/name).
 
-Gate: `mix compile` bersih + `mix test` hijau + acceptance §4.A.
+Gate: `mix compile` bersih + `mix test` hijau + acceptance §4.A. **PASSED** — 31 tests, `--warnings-as-errors` clean. Fix pasca-review: named scope attribute set saat expansion, map timeout `:infinity`, ctx-shadow detection, `Config.normalize([])`, fallback clause chat/agent, registry nil guard, `UnknownCogError` menyebut override, reason `fail!` disimpan, `validate_input/2` ditegakkan.
 
 ## Slice B — nested engine
 

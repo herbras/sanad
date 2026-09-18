@@ -56,7 +56,7 @@ defmodule Sanad.DSL do
 
       @sanad_config %{}
       @sanad_step_counter 0
-      @roast_scope nil
+      @sanad_scope nil
 
       @before_compile Sanad.DSL
     end
@@ -80,7 +80,7 @@ defmodule Sanad.DSL do
 
   @doc "Declares a named execution scope, callable with `call(:name, value)`."
   defmacro execute(name, do: block) when is_atom(name) do
-    # `@roast_scope` must be written at expansion time: nested cog macros read it
+    # `@sanad_scope` must be written at expansion time: nested cog macros read it
     # while expanding (before any emitted module-body expression is evaluated).
     Module.put_attribute(__CALLER__.module, :sanad_scope, name)
 

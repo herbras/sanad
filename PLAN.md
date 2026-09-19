@@ -113,15 +113,19 @@ Gate: PASSED, 123 tests. Semua contoh dan snippet README resolve identik; `norma
 
 ## Slice H: chat dan agent lanjutan
 
-- [ ] H1 Streaming chat yang mengemit event `stdout` (butuh Slice E). Catatan desain: retry
-      `:transient` tidak bisa dipertahankan apa adanya setelah stream mulai mengalir, jadi
-      perilakunya harus diputuskan eksplisit sebelum ditulis.
-- [ ] H2 JSON mode dan tool calls.
+- [x] H1 Streaming chat: dekoder SSE murni per provider (`Sanad.Cogs.Chat.Stream`), tiap delta
+      jadi event `stdout`. Retry dimatikan saat streaming, karena mengulang berarti menayangkan
+      ulang teks yang sudah diserahkan ke pemanggil.
+- [x] H2 JSON mode (`json: true`) dan tool calls: definisi tool netral diterjemahkan per
+      provider, hasil panggilan dinormalisasi jadi `%{id:, name:, arguments:}`. Anthropic menolak
+      `json: true` dengan pesan jelas karena memang tidak punya JSON mode.
 - [x] H3 Normalisasi session lintas provider agent: `%Output.Agent{session:, stats:}`, pi dan
       claude mengisi, opencode dan agy `nil`.
 
-Gate: `Req.Test` untuk stream chunked dan tool call; stub CLI untuk session round-trip (sudah
-untuk H3, 131 tests).
+Gate: PASSED, 152 tests. `Req.Test` chunked untuk stream (termasuk delta yang terpotong di tengah
+JSON dan bukti tidak ada retry), `Req.Test` untuk tool call tiap provider, stub CLI untuk session.
+
+Sisa yang sengaja tidak dikerjakan: sanad tidak menjalankan tool; workflow yang memutuskan.
 
 ## Slice J: dukungan kelas satu untuk pi dan model Claude
 

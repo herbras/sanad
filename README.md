@@ -207,7 +207,41 @@ end
 `:opus` → `claude-opus-5`, `:sonnet` → `claude-sonnet-5`, `:haiku` → `claude-haiku-4-5`,
 `:fable` → `claude-fable-5-1`. Alias yang tidak dikenal ditolak dengan daftar yang sah.
 
-Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
+### Streaming, JSON mode, dan tool calls
+
+```elixir
+chat :draft, stream: true do
+  "Tulis draf panjang tentang #{params(ctx).topic}"
+end
+
+chat :extract, json: true do
+  "Kembalikan JSON dengan field title dan tags untuk: #{cmd!(ctx, :page).stdout}"
+end
+
+chat :maybe_tool, tools: [%{
+  name: "get_weather",
+  description: "Cuaca terkini sebuah kota",
+  parameters: %{type: "object", properties: %{city: %{type: "string"}}}
+}] do
+  "Bagaimana cuaca di Bandung?"
+end
+```
+
+`stream: true` memancarkan tiap delta sebagai event `stdout`, jadi token terlihat mengalir di
+terminal, dan `response` tetap berisi teks utuh saat step selesai. Stream **tidak di-retry**:
+mengulang berarti menayangkan ulang teks yang sudah dikirim ke pemanggil.
+
+`json: true` memakai JSON mode native provider (`response_format` untuk OpenAI dan Perplexity,
+`responseMimeType` untuk Gemini). Anthropic tidak punya JSON mode, dan sanad mengatakannya
+terang-terangan alih-alih diam-diam mengabaikan — pakai tool dengan schema yang diinginkan.
+
+Definisi tool ditulis sekali dalam bentuk netral (`name`, `description`, `parameters`) lalu
+diterjemahkan ke bentuk tiap provider. Panggilan tool dikembalikan apa adanya di
+`chat!(ctx, :name).tool_calls` sebagai `%{id:, name:, arguments:}` — sanad **tidak menjalankan**
+tool untukmu; workflow yang memutuskan, misalnya lewat `elixir_cog` lalu `chat` berikutnya.
+
+Opsi per step: `:provider`, `:model`, `:stream`, `:json`, `:response_format`, `:tools`,
+`:tool_choice`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
 
 ### Agent providers
 

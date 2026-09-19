@@ -5,7 +5,7 @@ defmodule Sanad.Output do
 
   defmodule Chat do
     @moduledoc "Output of the chat cog."
-    defstruct [:response, :model, :provider, raw: %{}]
+    defstruct [:response, :model, :provider, tool_calls: [], raw: %{}]
   end
 
   defmodule Cmd do

@@ -355,6 +355,19 @@ Semua tes offline:
 - Chat: `Req.Test` (plug test-only) untuk 4 provider, error HTTP/transport, dan override config.
 - Agent: stub executable `pi`, `claude`, `opencode`, `agy`.
 - E2E: subprocess `mix sanad.execute` untuk pipeline penuh, scope, params, control flow, dan jalur gagal.
+- Regresi contoh: tiap berkas di `examples/` dijalankan lewat escript hasil build, plus pemeriksaan
+  bentuk `%MapResult{}`, `%Repeat{}`, dan `%Call{}` yang dipakai README. Contoh yang butuh provider
+  dikenali dari manifest langkahnya sendiri, bukan dari daftar yang gampang basi.
+
+Tes yang memanggil CLI agent sungguhan tidak ikut jalan secara bawaan, karena butuh binary
+terpasang dan token sungguhan:
+
+```bash
+mix test --include live_providers   # atau SANAD_LIVE=1 mix test
+```
+
+Provider yang binary-nya tidak ada di PATH tidak menghasilkan tes sama sekali; kalau tidak ada satu
+pun, suite itu melaporkan satu tes ter-skip, bukan lulus tanpa menguji apa-apa.
 
 ## Divergensi yang didokumentasikan
 

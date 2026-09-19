@@ -34,7 +34,7 @@ sanad/
   lib/mix/tasks/sanad.execute.ex
 ```
 
-Environment note: the sandbox that created this MVP **did not have Elixir/Mix**. Nothing here has been compiled. First task on a real machine: `mix deps.get && mix compile` and fix whatever breaks.
+Environment note: the machine this is developed on has no Elixir on PATH. Use `./bin/mix`, which runs mix inside `elixir:1.18-alpine` with the repo mounted. CI runs the same gates natively.
 
 ---
 
@@ -57,7 +57,7 @@ Priority for handoff: **P0** must-have for Roast-like workflows, **P1** parity, 
 
 | Roast (Ruby) | Sanad | Status | Pri | Notes for implementer |
 |---|---|---|---|---|
-| `config do ... end` | `config do %{...} end` | PARTIAL | P0 | Ruby uses nested DSL (`config { chat { provider :anthropic } }`). Elixir only accepts a map/keyword today. Replicate nested macros **or** keep map and document it. |
+| `config do ... end` | `config do %{...} end` plus scoped form | DONE | P0 | Both forms: the map, and `global(...)` / `chat(:name, ...)` / `chat(~r/.../, ...)`. Resolution order matches `config_for`. |
 | `execute do ... end` | `execute do ... end` | PARTIAL | P0 | No named scopes (`execute :scope_name`). Steps accumulated via module attribute. |
 | `execute(:scope) { }` | — | MISSING | P0 | Needed for `call`. |
 | `use :my_cog` / `use :foo, from: "gem"` | — | MISSING | P1 | Loads cog class into registry. |
@@ -83,8 +83,8 @@ Priority for handoff: **P0** must-have for Roast-like workflows, **P1** parity, 
 | `ExecutionManager` + barriers | sequential `Enum.reduce` | PARTIAL | P1 | Ruby can overlap independent cogs via `Async::Barrier`. Elixir: only `map` is parallel. |
 | `CogInputContext` / `instance_exec` | anonymous `fn ctx ->` | PARTIAL | P1 | Input objects + coerce/validate missing. |
 | `TaskContext.begin_cog` | — | MISSING | P2 | Logging / tracing hook. |
-| `EventMonitor` | — | MISSING | P1 | Lifecycle events for UI/logs. |
-| `OutputRouter` / pretty logs | `inspect` in Mix task | MISSING | P1 | |
+| `EventMonitor` | `Sanad.Events` + `Sanad.Event` | DONE | P1 | `:telemetry` spans for workflow/scope/cog plus stdout/stderr/block/log. No monitor process, so no global order — documented. |
+| `OutputRouter` / pretty logs | `Sanad.Events.Renderer` | PARTIAL | P1 | Roast log format on stderr. A workflow's own `IO.puts` is not captured: that needs a group-leader process, deliberately not built. |
 | `abort_on_failure` default true | always raise | PARTIAL | P1 | Make configurable per cog / global. |
 | ControlFlow::Break at top-level = stop quietly | — | MISSING | P0 | |
 
@@ -103,6 +103,7 @@ Priority for handoff: **P0** must-have for Roast-like workflows, **P1** parity, 
 | multi-message / history | MISSING | P2 |
 | streaming | MISSING | P2 |
 | JSON mode / tools | MISSING | P2 |
+| model aliases + `:claude` provider alias | DONE | P2 |
 | retries, rate-limit, timeout | MISSING | P1 |
 | structured output types (`Output.Chat`) | DONE | P1 |
 
@@ -173,18 +174,18 @@ Upstream shims: `sorbet/rbi/shims/lib/sanad/config_context.rbi`, `lib/sanad/cog/
 
 | Roast | Sanad | Status | Pri |
 |---|---|---|---|
-| EventMonitor start/stop | — | MISSING | P1 |
+| EventMonitor start/stop | `[:sanad, _, :start \| :stop]` | DONE | P1 |
 | Rainbow colored logs | — | MISSING | P2 |
 | task annotations | — | MISSING | P2 |
-| workflow success/fail summary | inspect map | MISSING | P1 |
+| workflow success/fail summary | `Sanad.Summary` (top-level only) | PARTIAL | P1 |
 
 ### 1.10 Tests & docs
 
 | Item | Status | Pri |
 |---|---|---|
-| ExUnit unit tests | MISSING | P0 |
-| ExUnit for DSL compile | MISSING | P0 |
-| HTTP client mocked | MISSING | P0 |
+| ExUnit unit tests | DONE (128 tests) | P0 |
+| ExUnit for DSL compile | DONE | P0 |
+| HTTP client mocked | DONE (`Req.Test`) | P0 |
 | port Roast `examples/` as fixtures | MISSING | P1 |
 | tutorial chapters 1–9 | MISSING | P2 |
 | `@moduledoc` completeness | PARTIAL | P2 |
@@ -301,6 +302,22 @@ Work in PRs/commits in this order. Each step should leave `mix compile` green an
 16. Hex + README status table update.
 
 ---
+
+## 3b. Status per 19 September 2026
+
+Slice A sampai D selesai sebelumnya. Sesudah itu:
+
+* **Slice 0** toolchain container (`bin/mix`) dan CI.
+* **Slice E** event system: span workflow/scope/cog lewat `:telemetry`, path event ikut ke proses
+  anak `map` karena hidup di `Sanad.Context`, stdout streaming dari cmd, block untuk prompt dan
+  response, renderer ala Roast di stderr (`--quiet` untuk mematikannya).
+* **Slice F** `outputs` dan `outputs!` sebagai nilai balik scope.
+* **Slice G** config per nama dan per pola, bentuk map lama tetap jalan.
+* **Slice J1** alias provider `:claude` dan alias model (`:opus`, `:sonnet`, `:haiku`, `:fable`).
+
+Belum: streaming chat, JSON mode dan tool calls, normalisasi session agent (Slice H); stats dan
+usage pi (J2); ringkasan yang diturunkan dari event (E4); preflight validasi config (G3);
+tutorial 1-9 dan publish Hex (I).
 
 ## 4. Acceptance checks (agent should not mark done without these)
 

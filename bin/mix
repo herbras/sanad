@@ -27,6 +27,11 @@ if [ -t 0 ] && [ -t 1 ]; then
   args+=(--tty --interactive)
 fi
 
+# Forwarded so `hex.publish` can authenticate without an interactive login.
+if [ -n "${HEX_API_KEY:-}" ]; then
+  args+=(--env "HEX_API_KEY=$HEX_API_KEY")
+fi
+
 mkdir -p "$root/.container"
 
 if [ ! -d "$root/.container/mix/archives" ]; then

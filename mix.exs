@@ -1,7 +1,7 @@
 defmodule Sanad.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/herbras/sanad"
 
   def project do
@@ -38,7 +38,7 @@ defmodule Sanad.MixProject do
       },
       # Planning docs stay out of the package; tutorials and examples go in,
       # because they are what a new reader actually needs.
-      files: ~w(lib examples tutorial mix.exs README.md LICENSE .formatter.exs)
+      files: ~w(lib examples tutorial mix.exs README.md CHANGELOG.md LICENSE .formatter.exs)
     ]
   end
 
@@ -46,7 +46,7 @@ defmodule Sanad.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
-      extras: ["README.md" | tutorial_extras()],
+      extras: ["README.md", "CHANGELOG.md" | tutorial_extras()],
       groups_for_extras: [Tutorial: ~r{tutorial/}]
     ]
   end

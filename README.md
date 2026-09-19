@@ -58,7 +58,7 @@ Butuh Elixir 1.16+ dan Mix. Tambahkan ke `mix.exs` proyekmu:
 
 ```elixir
 def deps do
-  [{:sanad, "~> 0.1"}]
+  [{:sanad, "~> 0.2"}]
 end
 ```
 

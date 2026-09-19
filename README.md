@@ -43,7 +43,7 @@ MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow 
 
 ## Belajar dari nol
 
-Ada tutorial sembilan bab berbahasa Indonesia di [`tutorial/`](tutorial/), dari menjalankan
+Ada tutorial sembilan bab berbahasa Indonesia di [`tutorial/`](tutorial/README.md), dari menjalankan
 satu langkah sampai mengerjakan banyak hal secara paralel. Semua contohnya bisa dijalankan
 tanpa API key, dengan contoh kasus dari berbagai bidang: administrasi, keuangan, pengajaran,
 customer service, riset, dan operasional.
@@ -54,10 +54,19 @@ mix sanad.execute tutorial/01_workflow_pertama/salam.exs
 
 ## Install
 
-Butuh Elixir 1.16+ dan Mix.
+Butuh Elixir 1.16+ dan Mix. Tambahkan ke `mix.exs` proyekmu:
+
+```elixir
+def deps do
+  [{:sanad, "~> 0.1"}]
+end
+```
+
+Atau kerjakan langsung dari sumbernya:
 
 ```bash
-cd roast_ex
+git clone https://github.com/herbras/sanad
+cd sanad
 mix deps.get
 mix test
 ```

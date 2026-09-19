@@ -24,3 +24,7 @@ erl_crash.dump
 
 # Container toolchain (bin/mix)
 /.container/
+
+# Hex and docs build artifacts
+/doc/
+*.tar

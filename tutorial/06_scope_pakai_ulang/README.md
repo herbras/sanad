@@ -91,4 +91,4 @@ mix sanad.execute tutorial/06_scope_pakai_ulang/balasan.exs
 
 Tambah satu tiket lagi, lalu buat `:ringkasan` menyebut ketiganya.
 
-Berikutnya: [Bab 7 - Banyak item](../07_banyak_item/)
+Berikutnya: [Bab 7 - Banyak item](../07_banyak_item/README.md)

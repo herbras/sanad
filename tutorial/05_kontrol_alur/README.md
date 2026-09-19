@@ -83,4 +83,4 @@ Perbedaan intinya: `skip!` artinya "wajar", `fail!` artinya "tidak wajar".
 Ubah contohnya agar `fail!` dipanggil kalau ada nilai negatif, lalu jalankan dua kali:
 sekali dengan `abort_on_failure: true`, sekali `false`. Perhatikan bedanya di ringkasan.
 
-Berikutnya: [Bab 6 - Scope pakai ulang](../06_scope_pakai_ulang/)
+Berikutnya: [Bab 6 - Scope pakai ulang](../06_scope_pakai_ulang/README.md)

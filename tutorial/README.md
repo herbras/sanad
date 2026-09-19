@@ -17,15 +17,15 @@ langkah sebelumnya. Sanad adalah cara menulis resep seperti itu untuk komputer.
 
 | Bab | Isi | Butuh API key? |
 |---|---|---|
-| [01 - Workflow pertama](01_workflow_pertama/) | Menjalankan satu langkah | Tidak |
-| [02 - Merantai cog](02_merantai_cog/) | Hasil langkah dipakai langkah berikutnya | Tidak |
-| [03 - Params](03_params/) | Memberi masukan dari luar | Tidak |
-| [04 - Konfigurasi](04_konfigurasi/) | Mengatur model dan opsi | Tidak |
-| [05 - Kontrol alur](05_kontrol_alur/) | Melewati, menggagalkan, menghentikan | Tidak |
-| [06 - Scope pakai ulang](06_scope_pakai_ulang/) | Menulis sekali, panggil berkali-kali | Tidak |
-| [07 - Banyak item](07_banyak_item/) | Mengerjakan daftar | Tidak |
-| [08 - Perulangan](08_perulangan/) | Mengulang sampai cukup | Tidak |
-| [09 - Paralel](09_paralel/) | Mengerjakan bersamaan | Tidak |
+| [01 - Workflow pertama](01_workflow_pertama/README.md) | Menjalankan satu langkah | Tidak |
+| [02 - Merantai cog](02_merantai_cog/README.md) | Hasil langkah dipakai langkah berikutnya | Tidak |
+| [03 - Params](03_params/README.md) | Memberi masukan dari luar | Tidak |
+| [04 - Konfigurasi](04_konfigurasi/README.md) | Mengatur model dan opsi | Tidak |
+| [05 - Kontrol alur](05_kontrol_alur/README.md) | Melewati, menggagalkan, menghentikan | Tidak |
+| [06 - Scope pakai ulang](06_scope_pakai_ulang/README.md) | Menulis sekali, panggil berkali-kali | Tidak |
+| [07 - Banyak item](07_banyak_item/README.md) | Mengerjakan daftar | Tidak |
+| [08 - Perulangan](08_perulangan/README.md) | Mengulang sampai cukup | Tidak |
+| [09 - Paralel](09_paralel/README.md) | Mengerjakan bersamaan | Tidak |
 
 Semua contoh di tutorial ini bisa dijalankan **tanpa API key**, supaya kamu bisa belajar
 dulu tanpa biaya. Di tiap bab ada catatan cara menggantinya dengan `chat` atau `agent`

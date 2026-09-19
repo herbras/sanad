@@ -72,6 +72,9 @@ defmodule Sanad.Cogs.Chat do
         response = streamed_text(provider, ctx, resp)
         %Chat{response: response, model: model, provider: provider, raw: resp.body}
 
+      {:ok, %{status: status} = resp} when stream? ->
+        raise Sanad.ChatError, provider: provider, status: status, body: streamed_raw(resp)
+
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         {response, tool_calls} = extract_result(provider, body)
         Events.block(ctx, "response", response)
@@ -196,21 +199,32 @@ defmodule Sanad.Cogs.Chat do
   defp stream_options(ctx, provider, true) do
     [
       into: fn {:data, data}, {req, resp} ->
-        state = Req.Response.get_private(resp, :sanad_stream, %{buffer: "", text: []})
+        state = Req.Response.get_private(resp, :sanad_stream, empty_stream_state())
         {deltas, buffer} = Stream.decode(provider, state.buffer, data)
 
         # Emitted as they arrive, so the renderer shows tokens live rather
         # than one block once the whole answer is in.
         Enum.each(deltas, &Events.stdout(ctx, &1))
 
-        state = %{buffer: buffer, text: [state.text | deltas]}
+        # The raw bytes are kept as well: an error response is not SSE, and
+        # without them a failed stream would report an empty body.
+        state = %{buffer: buffer, text: [state.text | deltas], raw: [state.raw, data]}
         {:cont, {req, Req.Response.put_private(resp, :sanad_stream, state)}}
       end
     ]
   end
 
+  defp empty_stream_state, do: %{buffer: "", text: [], raw: []}
+
+  defp streamed_raw(resp) do
+    resp
+    |> Req.Response.get_private(:sanad_stream, empty_stream_state())
+    |> Map.fetch!(:raw)
+    |> IO.iodata_to_binary()
+  end
+
   defp streamed_text(provider, ctx, resp) do
-    state = Req.Response.get_private(resp, :sanad_stream, %{buffer: "", text: []})
+    state = Req.Response.get_private(resp, :sanad_stream, empty_stream_state())
     trailing = Stream.finish(provider, state.buffer)
     Enum.each(trailing, &Events.stdout(ctx, &1))
 

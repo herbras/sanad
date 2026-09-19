@@ -141,13 +141,18 @@ defmodule ChatStreamTest do
         Plug.Conn.send_resp(conn, 500, ~s({"error":"boom"}))
       end)
 
-      assert_raise Sanad.ChatError, fn ->
-        Sanad.Cogs.Chat.run(
-          "hi",
-          [stream: true, req_options: [plug: {Req.Test, :stream_failing}]],
-          %Context{}
-        )
-      end
+      error =
+        assert_raise Sanad.ChatError, fn ->
+          Sanad.Cogs.Chat.run(
+            "hi",
+            [stream: true, req_options: [plug: {Req.Test, :stream_failing}]],
+            %Context{}
+          )
+        end
+
+      # The error body must survive: a failing stream is not SSE, so the
+      # collector's raw bytes are the only copy of what the server said.
+      assert Exception.message(error) =~ "boom"
 
       assert_received :attempt
       refute_received :attempt

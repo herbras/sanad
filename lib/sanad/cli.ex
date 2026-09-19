@@ -15,7 +15,13 @@ defmodule Sanad.CLI do
 
     {opts, rest, invalid} =
       OptionParser.parse(args,
-        strict: [module: :string, param: :keep, help: :boolean, quiet: :boolean]
+        strict: [
+          module: :string,
+          param: :keep,
+          help: :boolean,
+          quiet: :boolean,
+          events: :string
+        ]
       )
 
     cond do
@@ -59,7 +65,7 @@ defmodule Sanad.CLI do
       System.halt(1)
     end
 
-    unless opts[:quiet], do: Sanad.Events.Renderer.attach()
+    attach_events(opts)
 
     started = System.monotonic_time(:millisecond)
 
@@ -75,6 +81,24 @@ defmodule Sanad.CLI do
     e ->
       IO.puts(:stderr, "sanad: " <> Exception.message(e))
       System.halt(1)
+  end
+
+  # Events render as Roast-style lines by default; `--events jsonl` writes one
+  # JSON object per event instead, for anything downstream that parses.
+  defp attach_events(opts) do
+    case {opts[:quiet], opts[:events] || System.get_env("SANAD_EVENT_FORMAT") || "pretty"} do
+      {true, _format} ->
+        :ok
+
+      {_quiet, "jsonl"} ->
+        Sanad.Events.Jsonl.attach()
+
+      {_quiet, "pretty"} ->
+        Sanad.Events.Renderer.attach()
+
+      {_quiet, other} ->
+        usage_error("unknown --events format: #{other} (expected pretty | jsonl)")
+    end
   end
 
   defp usage_error(nil) do
@@ -102,7 +126,8 @@ defmodule Sanad.CLI do
     Options:
       --module   module defined in the file (default: inferred from filename)
       --param    workflow param, repeatable (available via params(ctx))
-      --quiet    do not render run events to stderr
+      --events   run event format: pretty (default) or jsonl
+      --quiet    do not render run events at all
       --help     show this help
 
     Env:

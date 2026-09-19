@@ -32,11 +32,12 @@ MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow 
 | Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | Ya |
 | CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | Ya |
 | Ringkasan run (status dan durasi per cog) | Ya |
-| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 123 tes |
+| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 158 tes |
 | Event run (span workflow/scope/cog, stdout/stderr, block) + renderer ala Roast | Ya |
 | Scope `outputs` / `outputs!` | Ya |
 | Config per-nama dan regex (`chat(:x, ...)`, `chat(~r/.../, ...)`) | Ya |
-| Streaming chat, JSON mode/tools, session normalization penuh | Belum |
+| Streaming chat, JSON mode, tool calls, session agent | Ya |
+| Event JSONL untuk dibaca mesin (`--events jsonl`) | Ya |
 | Tutorial 1-9, publish Hex | Ditunda |
 
 ## Install
@@ -170,6 +171,14 @@ cmd(:echo) Starting
 cmd(:echo) ❯ hello
 map(:lengths) -> {:string_length}[2] Complete
 🔥🔥🔥 Workflow Complete
+```
+
+Untuk dibaca mesin, pakai `--events jsonl` (atau `SANAD_EVENT_FORMAT=jsonl`): satu objek JSON per
+baris, ke stderr, sehingga stdout tetap bersih untuk hasil workflow.
+
+```bash
+mix sanad.execute examples/local_pipeline.exs --events jsonl 2>events.jsonl
+jq -r 'select(.event=="cog.stop") | "\(.duration_ms)ms \(.path)"' events.jsonl
 ```
 
 Event dipancarkan lewat `:telemetry` dengan nama `[:sanad, :workflow | :scope |

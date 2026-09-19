@@ -143,6 +143,18 @@ protokol JSON), dan Anthropic sudah provider chat. Yang kurang adalah kelas satu
 Gate: workflow contoh yang memakai `agent(:x)` dengan pi dan `chat(:y)` dengan Claude jalan tanpa
 konfigurasi tambahan selain API key; tes offline tetap hijau.
 
+## Slice K: UI
+
+Urutan disetujui: JSONL dulu, lalu OpenTelemetry, lalu laporan HTML.
+
+- [x] K1 `--events jsonl` plus `SANAD_EVENT_FORMAT`: satu objek JSON per baris ke stderr,
+      payload panjang dipotong supaya satu event tetap satu baris.
+- [ ] K2 Bridge OpenTelemetry lewat `opentelemetry_telemetry`: span kita sudah berbentuk
+      start/stop dengan `telemetry_span_context`, jadi waterfall didapat tanpa kode UI sendiri.
+- [ ] K3 Laporan HTML satu berkas dari JSONL: pohon cog, durasi, blok prompt dan response.
+
+Gate K1: PASSED, 158 tests, termasuk E2E yang mengurai JSONL dari subprocess CLI.
+
 ## Slice I: rilis (ditunda sampai diminta)
 
 - [ ] I1 Tutorial 1-9.

@@ -41,6 +41,7 @@ defmodule Sanad.Cogs.Map do
     caller with its original type and stacktrace.
   """
 
+  alias Sanad.Events
   alias Sanad.Runner
   alias Sanad.Cogs.Nested
   alias Sanad.Output.MapResult
@@ -140,12 +141,25 @@ defmodule Sanad.Cogs.Map do
   defp start_one(state) do
     [{item, scope_index, position} | rest] = state.pending
 
+    # The span ref is allocated here, not in the child, so this process can
+    # close the child's scope span if it has to kill the child before it
+    # closes its own. The context (and with it the event path) crosses into
+    # the task as ordinary data captured by the closure.
+    span_ref = make_ref()
+
     task =
       Task.Supervisor.async_nolink(Sanad.TaskSupervisor, fn ->
-        Runner.run_scope(state.ctx, state.scope, item, scope_index)
+        Runner.run_scope(state.ctx, state.scope, item, scope_index, span_context: span_ref)
       end)
 
-    entry = %{task: task, position: position, started: now_ms()}
+    entry = %{
+      task: task,
+      position: position,
+      started: now_ms(),
+      started_native: System.monotonic_time(),
+      scope_index: scope_index,
+      span_ref: span_ref
+    }
 
     %{state | pending: rest, running: Map.put(state.running, task.ref, entry)}
   end
@@ -153,6 +167,10 @@ defmodule Sanad.Cogs.Map do
   defp await_one(state) do
     wait = remaining_timeout(state.running, state.timeout)
 
+    # This `receive` runs in the caller's process and therefore matches only
+    # its own task messages: anything else in the mailbox belongs to the
+    # caller and must stay there. Leftover `:DOWN` messages from tasks that
+    # were killed are flushed by `drain_downs/0`.
     receive do
       {ref, result} when is_map_key(state.running, ref) ->
         {entry, running} = Map.pop(state.running, ref)
@@ -161,9 +179,6 @@ defmodule Sanad.Cogs.Map do
       {:DOWN, ref, :process, _pid, reason} when is_map_key(state.running, ref) ->
         {entry, running} = Map.pop(state.running, ref)
         handle_result(%{state | running: running}, entry, {:exit, reason})
-
-      _stale ->
-        await_one(state)
     after
       wait -> kill_expired(state)
     end
@@ -173,19 +188,35 @@ defmodule Sanad.Cogs.Map do
     state = %{state | results: Map.put(state.results, position, {final_output, child_ctx})}
 
     if control == :break do
-      halt(state)
+      halt(state, :break)
     else
       state
     end
   end
 
   defp handle_result(state, _entry, {:exit, reason}) do
-    halt(state)
+    halt(state, :sibling_exception)
     raise_iteration_error(reason)
   end
 
-  defp halt(state) do
-    Enum.each(state.running, fn {_ref, entry} -> Task.shutdown(entry.task, :brutal_kill) end)
+  # Killing a task `:brutal_kill` means the child never closes its own scope
+  # span, so this process closes it on the child's behalf, with the reason it
+  # was cancelled. Cog spans opened inside a killed child stay open: the
+  # parent cannot know how deep the child got.
+  defp halt(state, reason) do
+    Enum.each(state.running, fn {_ref, entry} ->
+      Task.shutdown(entry.task, :brutal_kill)
+
+      state.ctx
+      |> Events.push_scope(state.scope, entry.scope_index)
+      |> Events.span_cancelled(:scope, entry.span_ref, entry.started_native, %{
+        scope: state.scope,
+        index: entry.scope_index,
+        output: nil,
+        reason: reason
+      })
+    end)
+
     %{state | running: %{}, halted: true}
   end
 
@@ -199,7 +230,7 @@ defmodule Sanad.Cogs.Map do
       state
     else
       {_ref, entry} = hd(expired)
-      halt(state)
+      halt(state, :timeout)
 
       raise "map iteration #{entry.position} timed out after #{state.timeout}ms"
     end

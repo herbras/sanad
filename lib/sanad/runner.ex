@@ -12,7 +12,7 @@ defmodule Sanad.Runner do
   can implement Roast semantics.
   """
 
-  alias Sanad.{Cog, Config, Context}
+  alias Sanad.{Cog, Config, Context, Events}
 
   @typedoc "Signal returned by `run_steps/2` to the enclosing scope."
   @type control :: :ok | :next | :break
@@ -25,11 +25,22 @@ defmodule Sanad.Runner do
       config: Config.normalize(module.__sanad_config__()),
       params: Keyword.get(opts, :params, %{}),
       workflow_dir: Keyword.get(opts, :workflow_dir, File.cwd!()),
-      module: module
+      module: module,
+      run_id: Keyword.get(opts, :run_id) || make_ref()
     }
 
-    {ctx, _control} = run_steps(module.__sanad_steps__(), ctx)
-    ctx
+    meta = %{module: module, params: ctx.params, workflow_dir: ctx.workflow_dir}
+    span = Events.span_start(ctx, :workflow, meta)
+
+    try do
+      {ctx, _control} = run_steps(module.__sanad_steps__(), ctx)
+      Events.span_stop(ctx, :workflow, span, Map.put(meta, :statuses, ctx.statuses))
+      ctx
+    rescue
+      error ->
+        Events.span_exception(ctx, :workflow, span, :error, error, __STACKTRACE__, meta)
+        reraise error, __STACKTRACE__
+    end
   end
 
   def run(path, opts) when is_binary(path) do
@@ -64,22 +75,35 @@ defmodule Sanad.Runner do
   step's output (nil when the scope was skipped/ended early), matching
   upstream Roast's default final output.
   """
-  @spec run_scope(Context.t(), atom(), term(), non_neg_integer()) ::
+  @spec run_scope(Context.t(), atom(), term(), non_neg_integer(), keyword()) ::
           {term(), Context.t(), control()}
-  def run_scope(%Context{} = parent, scope, value, index \\ 0) when is_atom(scope) do
+  def run_scope(%Context{} = parent, scope, value, index \\ 0, opts \\ []) when is_atom(scope) do
     steps = fetch_scope!(parent, scope)
 
-    child = %{
-      parent
-      | outputs: %{},
-        statuses: %{},
-        failures: %{},
-        scope_value: value,
-        scope_index: index
-    }
+    child =
+      %{
+        parent
+        | outputs: %{},
+          statuses: %{},
+          failures: %{},
+          scope_value: value,
+          scope_index: index
+      }
+      |> Events.push_scope(scope, index)
 
-    {ctx, control} = run_steps(steps, child)
-    {final_output(steps, ctx), ctx, control}
+    meta = %{scope: scope, index: index, scope_value: value}
+    span = Events.span_start(child, :scope, meta, Keyword.get(opts, :span_context))
+
+    try do
+      {ctx, control} = run_steps(steps, child)
+      output = final_output(steps, ctx)
+      Events.span_stop(ctx, :scope, span, Map.merge(meta, %{control: control, output: output}))
+      {output, ctx, control}
+    rescue
+      error ->
+        Events.span_exception(child, :scope, span, :error, error, __STACKTRACE__, meta)
+        reraise error, __STACKTRACE__
+    end
   end
 
   defp fetch_scope!(%Context{module: nil}, scope) do
@@ -104,22 +128,42 @@ defmodule Sanad.Runner do
     opts = normalize_opts(opts)
     started = System.monotonic_time(:millisecond)
 
+    # The cog element is appended for the duration of this step only: the input
+    # block and the cog see it (so nested scopes hang off it), while the outer
+    # context keeps recording outputs one level up.
+    cog_ctx = Events.push_cog(ctx, type, name)
+    meta = %{type: type, name: name, opts: opts}
+    span = Events.span_start(cog_ctx, :cog, meta)
+
     result =
       try do
-        input = eval_fun(fun, ctx)
+        input = eval_fun(fun, cog_ctx)
         cog = fetch_cog!(type)
-        {:ok, Cog.run(cog, input, opts, ctx)}
+        {:ok, Cog.run(cog, input, opts, cog_ctx)}
+      rescue
+        error ->
+          Events.span_exception(cog_ctx, :cog, span, :error, error, __STACKTRACE__, meta)
+          reraise error, __STACKTRACE__
       catch
         {:sanad_control, kind, message} -> {:control, kind, message}
       end
 
     elapsed = System.monotonic_time(:millisecond) - started
 
+    # Emitted before `handle_result/4`, which raises when a `fail!` aborts the
+    # workflow; otherwise an aborting step would never report how it ended.
+    Events.span_stop(cog_ctx, :cog, span, Map.put(meta, :status, status_of(result)))
+
     case handle_result(result, name, opts, ctx) do
       {:cont, ctx} -> {:cont, Context.put_timing(ctx, name, elapsed)}
       {:halt, ctx, control} -> {:halt, Context.put_timing(ctx, name, elapsed), control}
     end
   end
+
+  defp status_of({:ok, _output}), do: :ok
+  defp status_of({:control, :skip, _message}), do: :skipped
+  defp status_of({:control, :fail, _message}), do: :failed
+  defp status_of({:control, kind, _message}), do: kind
 
   defp handle_result({:ok, output}, name, _opts, ctx) do
     {:cont, Context.put(ctx, name, output)}

@@ -23,6 +23,7 @@ defmodule Sanad.Runner do
   def run(module, opts) when is_atom(module) do
     ctx = %Context{
       config: Config.normalize(module.__sanad_config__()),
+      config_index: config_index(module),
       params: Keyword.get(opts, :params, %{}),
       workflow_dir: Keyword.get(opts, :workflow_dir, File.cwd!()),
       module: module,
@@ -182,8 +183,19 @@ defmodule Sanad.Runner do
     end
   end
 
+  defp config_index(module) do
+    if function_exported?(module, :__sanad_config_index__, 0) do
+      module.__sanad_config_index__()
+    else
+      Sanad.Config.Index.from_legacy(module.__sanad_config__())
+    end
+  end
+
   defp execute_step(%{type: type, name: name, opts: opts, fun: fun}, ctx) do
-    opts = normalize_opts(opts)
+    # Workflow config is resolved here, the one place that knows both the
+    # cog's type and its name, so every cog receives one already-merged
+    # keyword list and the step's own options still win.
+    opts = Config.resolve(ctx.config_index, type, name, normalize_opts(opts))
     started = System.monotonic_time(:millisecond)
 
     # The cog element is appended for the duration of this step only: the input

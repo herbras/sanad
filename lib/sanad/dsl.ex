@@ -70,9 +70,65 @@ defmodule Sanad.DSL do
   keyword list; nested keyword lists are normalized to maps.
   """
   defmacro config(do: block) do
-    quote do
-      @sanad_config Sanad.Config.normalize(unquote(block))
+    case scoped_entries(block) do
+      nil ->
+        quote do
+          @sanad_config Sanad.Config.normalize(unquote(block))
+
+          @doc false
+          def __sanad_config_index__, do: Sanad.Config.Index.from_legacy(@sanad_config)
+        end
+
+      entries ->
+        quote do
+          @sanad_config Sanad.Config.Index.legacy_map(Sanad.Config.Index.build(unquote(entries)))
+
+          # Built on call, not stored: a compiled regex holds a reference,
+          # which cannot live in a module attribute.
+          @doc false
+          def __sanad_config_index__, do: Sanad.Config.Index.build(unquote(entries))
+        end
     end
+  end
+
+  # The scoped form is a block of `cog_type(opts)`, `cog_type(:name, opts)` or
+  # `cog_type(~r/pattern/, opts)` calls. Anything else — a map literal, a
+  # function call returning config — is the legacy value form. A block that
+  # mixes the two is rejected rather than guessed at.
+  defp scoped_entries(block) do
+    expressions =
+      case block do
+        {:__block__, _meta, expressions} -> expressions
+        single -> [single]
+      end
+
+    cond do
+      Enum.all?(expressions, &scoped_entry?/1) -> Enum.map(expressions, &scoped_entry/1)
+      Enum.any?(expressions, &scoped_entry?/1) -> raise_mixed_config!(expressions)
+      true -> nil
+    end
+  end
+
+  defp scoped_entry?({name, _meta, args})
+       when is_atom(name) and is_list(args) and length(args) in 1..2 do
+    Keyword.keyword?(List.last(args))
+  end
+
+  defp scoped_entry?(_expression), do: false
+
+  defp scoped_entry({name, _meta, [opts]}), do: quote(do: {unquote(name), nil, unquote(opts)})
+
+  defp scoped_entry({name, _meta, [scope, opts]}) do
+    quote(do: {unquote(name), unquote(scope), unquote(opts)})
+  end
+
+  defp raise_mixed_config!(expressions) do
+    offender = Enum.find(expressions, &(not scoped_entry?(&1)))
+
+    raise ArgumentError,
+          "config must be either a single value (a map or keyword list) or a block of " <>
+            "scoped declarations like `chat(:name, model: \"x\")`, not both; got: " <>
+            Macro.to_string(offender)
   end
 
   @doc "Declares the default (unnamed) execution scope."
@@ -318,6 +374,11 @@ defmodule Sanad.DSL do
     quote do
       @doc false
       def __sanad_config__, do: @sanad_config
+
+      unless Module.defines?(__MODULE__, {:__sanad_config_index__, 0}) do
+        @doc false
+        def __sanad_config_index__, do: Sanad.Config.Index.from_legacy(@sanad_config)
+      end
 
       @doc false
       def __sanad_scopes__ do

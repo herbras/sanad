@@ -82,6 +82,67 @@ defmodule OutputsTest do
     end
   end
 
+  defmodule NextWorkflow do
+    use Sanad.DSL
+
+    execute :inner do
+      elixir_cog(:a, do: 1)
+
+      outputs do
+        next!()
+      end
+    end
+
+    execute do
+      call_cog(:called, scope: :inner, do: :ignored)
+    end
+  end
+
+  defmodule FailedReadWorkflow do
+    use Sanad.DSL
+
+    config do
+      %{abort_on_failure: false}
+    end
+
+    execute :inner do
+      elixir_cog(:a, do: fail!("cog failed"))
+
+      outputs do
+        output!(ctx, :a)
+      end
+    end
+
+    execute do
+      call_cog(:called, scope: :inner, do: :ignored)
+    end
+  end
+
+  defmodule NestedReadWorkflow do
+    use Sanad.DSL
+
+    execute :leaf do
+      elixir_cog :a do
+        if ctx.scope_value == :stop, do: break!()
+        :leaf_value
+      end
+    end
+
+    execute :middle do
+      call_cog(:a, scope: :leaf, do: :stop)
+
+      outputs do
+        # `:a` is declared here too, but this read is against the child
+        # scope's context, so it must not be swallowed as one of ours.
+        from(output!(ctx, :a), fn child -> output!(child, :a) end)
+      end
+    end
+
+    execute do
+      call_cog(:called, scope: :middle, do: :ignored)
+    end
+  end
+
   defmodule TypoWorkflow do
     use Sanad.DSL
 
@@ -205,6 +266,22 @@ defmodule OutputsTest do
   test "fail! inside the block raises, even with abort_on_failure disabled" do
     assert_raise Sanad.OutputsFailedError, ~r/scope :inner called fail!: "bad projection"/, fn ->
       Sanad.run(FailingWorkflow, [])
+    end
+  end
+
+  test "next! inside the block makes the value nil" do
+    assert Sanad.run(NextWorkflow, []).outputs[:called].value == nil
+  end
+
+  test "reading a cog that failed always raises, as upstream leaves it unswallowed" do
+    assert_raise Sanad.CogFailedError, ~r/:a/, fn ->
+      Sanad.run(FailedReadWorkflow, [])
+    end
+  end
+
+  test "a missing output read out of a nested context is not swallowed as our own" do
+    assert_raise Sanad.OutputNotFoundError, ~r/:a/, fn ->
+      Sanad.run(NestedReadWorkflow, [])
     end
   end
 

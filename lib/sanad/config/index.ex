@@ -82,6 +82,11 @@ defmodule Sanad.Config.Index do
   @doc """
   Renders the index back into the legacy flat map, which is what
   `Sanad.Context` exposes as `config` for workflows that read it directly.
+
+  This is a lossy view on purpose: the per-name and per-pattern layers have
+  no place in a flat map. Cogs never need them, because the runner resolves
+  everything into a step's options before a cog runs; a workflow that wants
+  the full picture should read `ctx.config_index`.
   """
   @spec legacy_map(t()) :: map()
   def legacy_map(%__MODULE__{} = index) do

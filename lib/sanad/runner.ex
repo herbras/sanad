@@ -147,8 +147,13 @@ defmodule Sanad.Runner do
   end
 
   # Upstream swallows reads of cogs that were skipped or never ran, so a
-  # scope ended by `break!` needs no guard code. A name the scope never
-  # declared is a typo and always raises, even from the lenient `outputs`.
+  # scope ended by `break!` needs no guard code. Reads of a cog that *failed*
+  # are not swallowed — upstream leaves that error out of its rescue list.
+  #
+  # A name this scope never declared is a typo and always raises, even from
+  # the lenient `outputs`. The error's own outputs map is compared as well,
+  # so a missing output read out of a nested scope's context is not mistaken
+  # for one of this scope's own names.
   defp eval_outputs(%{kind: kind, fun: fun}, scope, steps, ctx) do
     declared = MapSet.new(steps, & &1.name)
 
@@ -156,7 +161,9 @@ defmodule Sanad.Runner do
       {eval_fun(fun, ctx), :ok}
     rescue
       error in Sanad.OutputNotFoundError ->
-        if kind == :outputs and MapSet.member?(declared, error.name) do
+        own_read? = MapSet.member?(declared, error.name) and error.outputs == ctx.outputs
+
+        if kind == :outputs and own_read? do
           {nil, :ok}
         else
           reraise error, __STACKTRACE__

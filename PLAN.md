@@ -113,23 +113,26 @@ Gate: PASSED, 123 tests. Semua contoh dan snippet README resolve identik; `norma
 
 ## Slice H: chat dan agent lanjutan
 
-- [ ] H1 Streaming chat yang mengemit event `stdout` (butuh Slice E).
+- [ ] H1 Streaming chat yang mengemit event `stdout` (butuh Slice E). Catatan desain: retry
+      `:transient` tidak bisa dipertahankan apa adanya setelah stream mulai mengalir, jadi
+      perilakunya harus diputuskan eksplisit sebelum ditulis.
 - [ ] H2 JSON mode dan tool calls.
-- [ ] H3 Normalisasi session lintas provider agent.
+- [x] H3 Normalisasi session lintas provider agent: `%Output.Agent{session:, stats:}`, pi dan
+      claude mengisi, opencode dan agy `nil`.
 
-Gate: `Req.Test` untuk stream chunked dan tool call; stub CLI untuk session round-trip.
+Gate: `Req.Test` untuk stream chunked dan tool call; stub CLI untuk session round-trip (sudah
+untuk H3, 131 tests).
 
 ## Slice J: dukungan kelas satu untuk pi dan model Claude
 
 Keadaan sekarang: `pi` sudah provider agent default (`pi --mode json -p`, `--fork`, parser
 protokol JSON), dan Anthropic sudah provider chat. Yang kurang adalah kelas satunya.
 
-- [ ] J1 Alias `provider: :claude` untuk chat Anthropic, plus default model yang masuk akal
-      (`claude-opus-5` untuk kerja berat, `claude-haiku-4-5` untuk yang murah) dan alias model
-      pendek supaya workflow tidak menuliskan ID panjang.
-- [ ] J2 Parity pi: normalisasi session lintas provider (lihat H3), plus stats dan usage
-      (token, biaya) dari protokol pi masuk ke `%Sanad.Output.Agent{}`. Acuan upstream:
-      `lib/roast/cogs/agent/stats.rb` dan `usage.rb`.
+- [x] J1 Alias `provider: :claude` untuk chat Anthropic plus alias model pendek (`:opus`,
+      `:sonnet`, `:haiku`, `:fable`). Default model Anthropic tetap `claude-haiku-4-5` supaya
+      workflow tanpa konfigurasi tidak diam-diam jadi mahal; pilih `model: :opus` kalau perlu.
+- [x] J2 Parity pi: session ternormalisasi plus stats dan usage (turn, token, cache, biaya, dan
+      rincian per model) dari protokol pi masuk ke `%Sanad.Output.Agent{}`.
 - [ ] J3 Smoke test live opsional di balik env (`SANAD_LIVE=1`): satu panggilan pi asli dan satu
       panggilan Anthropic asli. Tidak jalan di CI, tidak memblokir gate offline (keputusan D8).
 

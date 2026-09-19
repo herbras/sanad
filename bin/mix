@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Run mix inside a container, so the repo builds on machines without Elixir.
+#
+#   bin/mix deps.get
+#   bin/mix test
+#   bin/mix compile --warnings-as-errors
+#
+# Container builds land in _build/container so they never collide with a
+# host-native _build. Override the image with SANAD_ELIXIR_IMAGE.
+set -euo pipefail
+
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+image=${SANAD_ELIXIR_IMAGE:-elixir:1.18-alpine}
+
+args=(
+  --rm
+  --user "$(id -u):$(id -g)"
+  --volume "$root:/app"
+  --workdir /app
+  --env HOME=/app/.container
+  --env MIX_HOME=/app/.container/mix
+  --env HEX_HOME=/app/.container/hex
+  --env MIX_BUILD_ROOT=/app/_build/container
+)
+
+if [ -t 0 ] && [ -t 1 ]; then
+  args+=(--tty --interactive)
+fi
+
+mkdir -p "$root/.container"
+
+if [ ! -d "$root/.container/mix/archives" ]; then
+  docker run "${args[@]}" "$image" \
+    sh -c 'mix local.hex --force >/dev/null && mix local.rebar --force >/dev/null'
+fi
+
+exec docker run "${args[@]}" "$image" mix "$@"

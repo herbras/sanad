@@ -69,6 +69,28 @@ defmodule Sanad.Cogs.ChatTest do
     assert out.model == "sonar"
   end
 
+  test "provider :claude is the same as :anthropic, and model aliases expand" do
+    Req.Test.stub(:claude_alias, fn conn ->
+      Req.Test.json(conn, %{"content" => [%{"type" => "text", "text" => "hi"}]})
+    end)
+
+    out =
+      run_chat(
+        "prompt",
+        [provider: :claude, model: :opus, req_options: [plug: {Req.Test, :claude_alias}]],
+        %{}
+      )
+
+    assert out.provider == :anthropic
+    assert out.model == "claude-opus-5"
+  end
+
+  test "an unknown model alias is refused with the alias list" do
+    assert_raise Sanad.InvalidConfigError, ~r/unknown model alias :nope/, fn ->
+      run_chat("prompt", [provider: :claude, model: :nope], %{})
+    end
+  end
+
   test "config base_url, key_env and model override env vars" do
     System.put_env("OPENROUTER_TEST_KEY", "or-key")
     parent = self()

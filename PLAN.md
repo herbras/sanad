@@ -1,6 +1,6 @@
 # Sanad execution plan
 
-> STATUS: SELESAI. Slice A sampai D tuntas, 77 tes hijau, `mix compile --warnings-as-errors` bersih, E2E CLI (mix task dan escript) terverifikasi. Sisa opsional: tutorial 1-9, publish Hex, EventMonitor penuh.
+> STATUS: Slice A sampai D tuntas, 77 tes hijau, `mix compile --warnings-as-errors` bersih, E2E CLI (mix task dan escript) terverifikasi. Lanjutan parity ada di Slice 0 sampai I di bawah.
 
 Status legend: `[ ]` todo, `[~]` in progress, `[x]` done.
 
@@ -23,6 +23,15 @@ Ditunda, bukan bagian "selesai" sekarang: tutorial 1-9, publish Hex, dan render 
 | D7 | Agent cog: invocation benar dulu (prompt via stdin, flag pi/claude upstream, `cd` sama dengan workflow_dir, error jelas). Parsing stats penuh masuk P2. |
 | D8 | Tes wajib offline (`Req.Test`, stub CLI). Live smoke test opsional lewat env var. |
 | D9 | Hygiene: git init dan commit per slice, LICENSE MIT, `.gitignore`, `.formatter.exs`. README bahasa Indonesia, docs kode bahasa Inggris. |
+| D10 | Toolchain lewat container (`bin/mix`), karena mesin kerja sekarang tidak punya Elixir di PATH. |
+| D11 | Event dipancarkan lewat `:telemetry` tanpa proses monitor. Tidak ada urutan global; path event hidup di `Sanad.Context` supaya selamat menyeberang `Task.Supervisor`. |
+
+## Keputusan yang masih perlu persetujuan
+
+| # | Pertanyaan | Rekomendasi |
+|---|---|---|
+| Q1 | Pasang skill "TypeSafe" (`typesafe-ai/skills`) ke setup Claude Code? | Belum. Instruksinya datang dari teks tempelan, bukan dari repo ini, dan skill itu berorientasi TypeScript sementara repo ini Elixir. Perlu konfirmasi eksplisit sebelum menyentuh `~/.claude`. |
+| Q2 | Urutan UI: setelah Slice G, mulai dari `--events jsonl`, lalu bridge OpenTelemetry, lalu laporan HTML satu berkas. | Setuju dulu sebelum skema event dianggap permukaan publik. |
 
 ## Slice A: foundation
 
@@ -61,6 +70,96 @@ Gate: acceptance §4.C dan §4.D hijau. PASSED, 68 tests. Chat diuji via `Req.Te
 - [x] D4 Update README: status, API final, divergensi.
 
 Gate: acceptance §4.E hijau (file loading dan `--param`). PASSED, 72 tests termasuk E2E CLI jalur sukses dan gagal.
+
+## Slice 0: toolchain
+
+- [x] 0A `bin/mix`: wrapper Docker (`elixir:1.18-alpine`), uid pemanggil, `MIX_BUILD_ROOT=_build/container` supaya tidak bentrok dengan `_build` native.
+- [x] 0B CI GitHub Actions: `format --check-formatted`, `compile --warnings-as-errors`, `test`.
+
+Gate: `bin/mix test` hijau di mesin tanpa Elixir. PASSED, 77 tests.
+
+## Slice E: event system
+
+Acuan upstream: `lib/roast/event.rb`, `event_monitor.rb`, `task_context.rb`, `output_router.rb`.
+
+- [x] E1 `Sanad.Event` plus path runtime (`chat(:x) -> {:scope}[0]`). Path hidup di `Sanad.Context`, jadi ikut tersalin ke proses anak `map`.
+- [x] E2 Dispatch lewat `:telemetry` (sudah ada di `mix.lock` via finch/plug), renderer CLI, collector tes.
+- [x] E3 Span start/stop/exception per workflow, scope, dan cog; `stdout` streaming dari cmd, `stderr`, `block` untuk prompt dan response.
+- [ ] E4 `Sanad.Summary` diturunkan dari event. Ditunda: ringkasan sekarang masih dari `ctx.statuses`, jadi hanya mencakup scope teratas.
+
+Gate: PASSED, 95 tests. Tes urutan event untuk scope nested, penutupan span saat `break!`, dan E2E yang mengecek format path plus `--quiet`.
+
+Keputusan yang diambil di slice ini: tidak ada proses monitor dengan antrean. Konsekuensinya tidak ada urutan global; tes hanya boleh menegaskan urutan dalam satu path. Span cog di dalam iterasi yang di-kill tetap terbuka, dan itu didokumentasikan sebagai invarian.
+
+## Slice F: scope outputs
+
+Acuan upstream: `execution_manager.rb` (`bind_outputs`, `compute_final_output`).
+
+- [x] F1 `outputs do ... end` dan `outputs! do ... end` sebagai metadata scope, satu per scope (dobel = CompileError).
+- [x] F2 Nilai akhir untuk top-level (`ctx.final_output`), `call`, tiap child `map`, tiap iterasi `repeat`.
+- [x] F3 Semantik swallow: `skip!`/`next!` jadi `nil`, `break!` juga sambil mengakhiri loop, `fail!` melempar `OutputsFailedError`; akses output skipped/not-run ditelan `outputs` tapi dilempar `outputs!`. Nama yang tidak dideklarasikan selalu dilempar.
+
+Gate: PASSED, 108 tests. test/nested_test.exs tidak diubah dan tetap hijau.
+
+## Slice G: config per-nama dan regex
+
+Acuan upstream: `config_manager.rb` (`config_for`).
+
+- [x] G1 `config do global(...); chat(:x, ...); chat(~r/.../, ...) end`, dipilih lewat bentuk AST; bentuk map lama tetap jalan, blok campuran ditolak.
+- [x] G2 Urutan merge: global, general per-cog, semua regex yang match (urutan penulisan), nama persis, lalu opsi step.
+- [ ] G3 Preflight validasi sebelum step pertama jalan. Ditunda: validasi masih terjadi saat cog jalan, sama seperti upstream.
+
+Gate: PASSED, 123 tests. Semua contoh dan snippet README resolve identik; `normalize/1` tidak lagi merusak opsi bernilai keyword list.
+
+## Slice H: chat dan agent lanjutan
+
+- [x] H1 Streaming chat: dekoder SSE murni per provider (`Sanad.Cogs.Chat.Stream`), tiap delta
+      jadi event `stdout`. Retry dimatikan saat streaming, karena mengulang berarti menayangkan
+      ulang teks yang sudah diserahkan ke pemanggil.
+- [x] H2 JSON mode (`json: true`) dan tool calls: definisi tool netral diterjemahkan per
+      provider, hasil panggilan dinormalisasi jadi `%{id:, name:, arguments:}`. Anthropic menolak
+      `json: true` dengan pesan jelas karena memang tidak punya JSON mode.
+- [x] H3 Normalisasi session lintas provider agent: `%Output.Agent{session:, stats:}`, pi dan
+      claude mengisi, opencode dan agy `nil`.
+
+Gate: PASSED, 152 tests. `Req.Test` chunked untuk stream (termasuk delta yang terpotong di tengah
+JSON dan bukti tidak ada retry), `Req.Test` untuk tool call tiap provider, stub CLI untuk session.
+
+Sisa yang sengaja tidak dikerjakan: sanad tidak menjalankan tool; workflow yang memutuskan.
+
+## Slice J: dukungan kelas satu untuk pi dan model Claude
+
+Keadaan sekarang: `pi` sudah provider agent default (`pi --mode json -p`, `--fork`, parser
+protokol JSON), dan Anthropic sudah provider chat. Yang kurang adalah kelas satunya.
+
+- [x] J1 Alias `provider: :claude` untuk chat Anthropic plus alias model pendek (`:opus`,
+      `:sonnet`, `:haiku`, `:fable`). Default model Anthropic tetap `claude-haiku-4-5` supaya
+      workflow tanpa konfigurasi tidak diam-diam jadi mahal; pilih `model: :opus` kalau perlu.
+- [x] J2 Parity pi: session ternormalisasi plus stats dan usage (turn, token, cache, biaya, dan
+      rincian per model) dari protokol pi masuk ke `%Sanad.Output.Agent{}`.
+- [ ] J3 Smoke test live opsional di balik env (`SANAD_LIVE=1`): satu panggilan pi asli dan satu
+      panggilan Anthropic asli. Tidak jalan di CI, tidak memblokir gate offline (keputusan D8).
+
+Gate: workflow contoh yang memakai `agent(:x)` dengan pi dan `chat(:y)` dengan Claude jalan tanpa
+konfigurasi tambahan selain API key; tes offline tetap hijau.
+
+## Slice K: UI
+
+Urutan disetujui: JSONL dulu, lalu OpenTelemetry, lalu laporan HTML.
+
+- [x] K1 `--events jsonl` plus `SANAD_EVENT_FORMAT`: satu objek JSON per baris ke stderr,
+      payload panjang dipotong supaya satu event tetap satu baris.
+- [ ] K2 Bridge OpenTelemetry lewat `opentelemetry_telemetry`: span kita sudah berbentuk
+      start/stop dengan `telemetry_span_context`, jadi waterfall didapat tanpa kode UI sendiri.
+- [ ] K3 Laporan HTML satu berkas dari JSONL: pohon cog, durasi, blok prompt dan response.
+
+Gate K1: PASSED, 158 tests, termasuk E2E yang mengurai JSONL dari subprocess CLI.
+
+## Slice I: rilis (ditunda sampai diminta)
+
+- [x] I1 Tutorial 1-9 di `tutorial/`, bahasa Indonesia sederhana, tiap bab punya contoh yang
+      benar-benar jalan tanpa API key dan contoh kasus dari bidang berbeda.
+- [ ] I2 Publish Hex. Dilakukan setelah Slice G karena config adalah perubahan API publik terakhir.
 
 ## Process
 

@@ -8,16 +8,21 @@ defmodule Sanad.Context do
   value and index of the current nested invocation.
   """
 
+  @derive {Inspect, except: [:path, :run_id]}
   defstruct outputs: %{},
             statuses: %{},
             failures: %{},
             timings: %{},
             config: %{},
+            config_index: %Sanad.Config.Index{},
             params: %{},
             workflow_dir: ".",
             module: nil,
             scope_value: nil,
-            scope_index: nil
+            scope_index: nil,
+            path: [],
+            run_id: nil,
+            final_output: nil
 
   @type status :: :ok | :skipped | :failed
 
@@ -27,11 +32,15 @@ defmodule Sanad.Context do
           failures: map(),
           timings: map(),
           config: map(),
+          config_index: Sanad.Config.Index.t(),
           params: map(),
           workflow_dir: String.t(),
           module: module() | nil,
           scope_value: term(),
-          scope_index: non_neg_integer() | nil
+          scope_index: non_neg_integer() | nil,
+          path: Sanad.Event.path(),
+          run_id: reference() | nil,
+          final_output: term()
         }
 
   @doc "Stores a named output and marks it `:ok`."

@@ -34,6 +34,42 @@ defmodule Sanad.E2ETest do
     assert output =~ "results: [1, 2, 3, nil]"
   end
 
+  test "run events are rendered as the workflow runs, and --quiet turns them off" do
+    {output, 0} = run_cli(["examples/local_pipeline.exs"])
+
+    assert output =~ "🔥🔥🔥 Workflow Starting"
+    assert output =~ "cmd(:echo) ❯ hello"
+    assert output =~ "map(:lengths) -> {:string_length}[2] Complete"
+    assert output =~ "🔥🔥🔥 Workflow Complete"
+
+    {quiet, 0} = run_cli(["examples/local_pipeline.exs", "--quiet"])
+
+    refute quiet =~ "Workflow Starting"
+    assert quiet =~ "Sanad workflow finished in"
+  end
+
+  test "--events jsonl emits one parsable object per event" do
+    {output, 0} = run_cli(["examples/local_pipeline.exs", "--events", "jsonl"])
+
+    events =
+      output
+      |> String.split("\n", trim: true)
+      |> Enum.filter(&String.starts_with?(&1, "{"))
+      |> Enum.map(&Jason.decode!/1)
+
+    assert Enum.any?(events, &(&1["event"] == "workflow.start"))
+    assert Enum.any?(events, &(&1["event"] == "workflow.stop"))
+
+    map_scopes =
+      Enum.filter(events, &(&1["event"] == "scope.start" and &1["scope"] == "string_length"))
+
+    assert Enum.map(map_scopes, & &1["index"]) |> Enum.sort() == [0, 1, 2]
+
+    stops = Enum.filter(events, &(&1["event"] == "cog.stop"))
+    assert Enum.all?(stops, &is_integer(&1["duration_ms"]))
+    assert Enum.any?(stops, &(&1["name"] == "echo" and &1["status"] == "ok"))
+  end
+
   test "named scopes, call_cog and from/2 (ported upstream tutorial)" do
     {output, status} = run_cli(["examples/reusable_scopes.exs", "--module", "ReusableScopes"])
 

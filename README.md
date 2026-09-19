@@ -32,12 +32,25 @@ MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow 
 | Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | Ya |
 | CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | Ya |
 | Ringkasan run (status dan durasi per cog) | Ya |
-| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 77 tes |
-| Event monitor setara Roast | Belum |
-| Scope `outputs { }` / `outputs! { }` | Belum |
-| Config per-nama/regex (`chat(:x) do ... end`) | Belum |
-| Streaming, JSON mode/tools, session normalization penuh | Belum |
-| Tutorial 1-9, publish Hex | Ditunda |
+| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 158 tes |
+| Event run (span workflow/scope/cog, stdout/stderr, block) + renderer ala Roast | Ya |
+| Scope `outputs` / `outputs!` | Ya |
+| Config per-nama dan regex (`chat(:x, ...)`, `chat(~r/.../, ...)`) | Ya |
+| Streaming chat, JSON mode, tool calls, session agent | Ya |
+| Event JSONL untuk dibaca mesin (`--events jsonl`) | Ya |
+| Tutorial 1-9 (bahasa Indonesia, contoh lintas bidang) | Ya |
+| Publish Hex | Ditunda |
+
+## Belajar dari nol
+
+Ada tutorial sembilan bab berbahasa Indonesia di [`tutorial/`](tutorial/), dari menjalankan
+satu langkah sampai mengerjakan banyak hal secara paralel. Semua contohnya bisa dijalankan
+tanpa API key, dengan contoh kasus dari berbagai bidang: administrasi, keuangan, pengajaran,
+customer service, riset, dan operasional.
+
+```bash
+mix sanad.execute tutorial/01_workflow_pertama/salam.exs
+```
 
 ## Install
 
@@ -58,6 +71,10 @@ mix escript.build && ./sanad examples/local_pipeline.exs
 ```
 
 `examples/local_pipeline.exs` memakai `cmd`, `elixir_cog`, `call_cog`, `map_cog` (paralel), dan `repeat_cog`. Tidak butuh network.
+
+`examples/pi_and_claude.exs` menunjukkan jalur lengkapnya: agent `pi` mereview tiap file yang
+berubah, Claude mengubah tiap review jadi satu baris putusan, dengan config per nama dan
+`outputs` per scope. Butuh binary `pi` di PATH dan `ANTHROPIC_API_KEY`.
 
 ## Workflow
 
@@ -118,12 +135,75 @@ chat :name do "prompt" end
 agent :name do "prompt" end
 ```
 
+### Nilai balik scope
+
+```elixir
+execute :review_one do
+  elixir_cog(:draft, do: String.upcase(ctx.scope_value))
+
+  outputs do
+    %{item: ctx.scope_value, draft: output!(ctx, :draft)}
+  end
+end
+```
+
+Tanpa `outputs`, sebuah scope mengembalikan output cog terakhirnya. Dengan
+`outputs`, nilai itulah yang diterima `call`, tiap iterasi `map`, dan tiap
+iterasi `repeat` (termasuk yang diteruskan ke iterasi berikutnya).
+
+`skip!` dan `next!` di dalam blok membuat nilainya `nil`; `break!` juga, sambil
+mengakhiri loop; `fail!` melempar `Sanad.OutputsFailedError`. Membaca cog yang
+tidak sempat jalan karena `break!` ditelan (nilainya `nil`) supaya pemanggil
+tidak perlu kode penjaga — pakai `outputs!` kalau ingin dilempar. Nama yang
+tidak pernah dideklarasikan di scope itu selalu melempar, karena itu typo.
+
+### Config per nama dan pola
+
+```elixir
+config do
+  global(abort_on_failure: true)
+  chat(provider: :openai, model: "gpt-4o-mini")
+  chat(~r/^review_/, temperature: 0.0)
+  chat(:summary, model: "gpt-4o")
+end
+```
+
+Urutan merge, dari paling umum ke paling khusus: `global`, config umum per tipe
+cog, semua pola yang cocok dengan nama cog (sesuai urutan penulisan), nama
+persis, lalu opsi step yang tetap menang. Bentuk map yang lama tetap berlaku dan
+tidak berubah artinya.
+
+### Event run
+
+Selama workflow jalan, CLI mencetak jejaknya ke stderr:
+
+```
+🔥🔥🔥 Workflow Starting
+cmd(:echo) Starting
+cmd(:echo) ❯ hello
+map(:lengths) -> {:string_length}[2] Complete
+🔥🔥🔥 Workflow Complete
+```
+
+Untuk dibaca mesin, pakai `--events jsonl` (atau `SANAD_EVENT_FORMAT=jsonl`): satu objek JSON per
+baris, ke stderr, sehingga stdout tetap bersih untuk hasil workflow.
+
+```bash
+mix sanad.execute examples/local_pipeline.exs --events jsonl 2>events.jsonl
+jq -r 'select(.event=="cog.stop") | "\(.duration_ms)ms \(.path)"' events.jsonl
+```
+
+Event dipancarkan lewat `:telemetry` dengan nama `[:sanad, :workflow | :scope |
+:cog, :start | :stop | :exception]` plus `[:sanad, :cog, :stdout | :stderr |
+:block | :log]`. Pasang handler sendiri lewat `Sanad.Event.names/0`, atau
+matikan renderer bawaan dengan `--quiet`.
+
 ### Chat providers
 
 | provider | key env | base URL env |
 |---|---|---|
 | `:openai` | `OPENAI_API_KEY` | `OPENAI_API_BASE` |
-| `:anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_BASE` |
+| `:anthropic` (alias `:claude`) | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_BASE` |
 | `:gemini` | `GEMINI_API_KEY` | `GEMINI_API_BASE` |
 | `:perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_API_BASE` |
 
@@ -137,7 +217,52 @@ config do
 end
 ```
 
-Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
+Model Claude punya alias pendek, jadi workflow tidak perlu menuliskan ID panjang:
+
+```elixir
+chat :summary, provider: :claude, model: :opus do
+  "Ringkas ini: #{cmd!(ctx, :diff).stdout}"
+end
+```
+
+`:opus` → `claude-opus-5`, `:sonnet` → `claude-sonnet-5`, `:haiku` → `claude-haiku-4-5`,
+`:fable` → `claude-fable-5-1`. Alias yang tidak dikenal ditolak dengan daftar yang sah.
+
+### Streaming, JSON mode, dan tool calls
+
+```elixir
+chat :draft, stream: true do
+  "Tulis draf panjang tentang #{params(ctx).topic}"
+end
+
+chat :extract, json: true do
+  "Kembalikan JSON dengan field title dan tags untuk: #{cmd!(ctx, :page).stdout}"
+end
+
+chat :maybe_tool, tools: [%{
+  name: "get_weather",
+  description: "Cuaca terkini sebuah kota",
+  parameters: %{type: "object", properties: %{city: %{type: "string"}}}
+}] do
+  "Bagaimana cuaca di Bandung?"
+end
+```
+
+`stream: true` memancarkan tiap delta sebagai event `stdout`, jadi token terlihat mengalir di
+terminal, dan `response` tetap berisi teks utuh saat step selesai. Stream **tidak di-retry**:
+mengulang berarti menayangkan ulang teks yang sudah dikirim ke pemanggil.
+
+`json: true` memakai JSON mode native provider (`response_format` untuk OpenAI dan Perplexity,
+`responseMimeType` untuk Gemini). Anthropic tidak punya JSON mode, dan sanad mengatakannya
+terang-terangan alih-alih diam-diam mengabaikan — pakai tool dengan schema yang diinginkan.
+
+Definisi tool ditulis sekali dalam bentuk netral (`name`, `description`, `parameters`) lalu
+diterjemahkan ke bentuk tiap provider. Panggilan tool dikembalikan apa adanya di
+`chat!(ctx, :name).tool_calls` sebagai `%{id:, name:, arguments:}` — sanad **tidak menjalankan**
+tool untukmu; workflow yang memutuskan, misalnya lewat `elixir_cog` lalu `chat` berikutnya.
+
+Opsi per step: `:provider`, `:model`, `:stream`, `:json`, `:response_format`, `:tools`,
+`:tool_choice`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
 
 ### Agent providers
 
@@ -147,6 +272,21 @@ Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_to
 | `:claude` | `claude -p --verbose --output-format stream-json ...` | stdin | stream-json, field `result` |
 | `:opencode` | `opencode run <prompt>` | argv | teks |
 | `:agy` | `agy -p <prompt>` | argv | teks |
+
+Output agent berisi `response`, `session` (id percakapan provider, `nil` untuk provider tanpa
+konsep session), dan `stats`:
+
+```elixir
+out = agent!(ctx, :review)
+out.session                      # "sess-42" untuk pi, session_id untuk claude
+out.stats.num_turns              # jumlah giliran, nil kalau tidak dilaporkan
+out.stats.usage.input_tokens     # total token, plus output/cache_read/cache_write
+out.stats.usage.cost_usd         # biaya kalau provider melaporkannya
+out.stats.model_usage["pi-1"]    # rincian per model (pi)
+```
+
+Angka yang tidak dilaporkan provider bernilai `nil`, bukan `0`, supaya "tidak dilaporkan" tetap
+bisa dibedakan dari "nol".
 
 Default provider lewat `SANAD_DEFAULT_AGENT_PROVIDER`. `cd` default-nya `workflow_dir`. Binary yang tidak ketemu melempar `Sanad.MissingExecutableError`. Opsi: `:model`, `:system_prompt`, `:append_system_prompt`, `:session`, `:fork_session`, `:skip_permissions`, `:command`, `:env`, `:timeout`.
 
@@ -221,9 +361,8 @@ Semua tes offline:
 - `ruby` diganti `elixir_cog` yang mengembalikan nilai mentah. Tidak ada evaluasi string Ruby.
 - Agent satu prompt per step. Upstream bisa multi-prompt dan merantai sesi. Opsi `:fork_session` untuk claude tersedia, default `true` saat `:session` diisi.
 - Chat menambah `system_prompt`, `max_tokens`, `temperature`, retry, timeout, `PERPLEXITY_API_BASE`, dan override `base_url`/`api_key`/`key_env`. Upstream lebih minim.
-- `outputs { }` dan `outputs! { }` untuk nilai balik scope belum ada. Default-nya output cog terakhir.
-- Config per-nama atau regex ala Roast (`chat(:x) do ... end`) belum ada. Pakai opsi step.
-- Event rendering Roast (glyph dan block events) belum direplikasi. Sanad punya ringkasan run.
+- Event dipancarkan lewat `:telemetry`, bukan satu proses monitor dengan antrean. Konsekuensinya tidak ada urutan global: event dari iterasi `map` paralel saling menyela, dan hanya event satu path yang terurut penuh. Span cog di dalam iterasi yang di-*kill* `break!` tidak tertutup; scope di atasnya ditutup dengan `control: :cancelled`.
+- Config per-nama memakai `chat(:x, model: "...")`, bukan blok `chat(:x) do ... end` — Elixir tidak punya receiver implisit, dan `instance_eval` tidak diport (keputusan D2).
 - Heuristik `MaxTokensExceededError` dari upstream tidak direplikasi.
 - `cmd :timeout` adalah tambahan Sanad, upstream tidak punya.
 

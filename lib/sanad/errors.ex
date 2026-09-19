@@ -112,3 +112,16 @@ defmodule Sanad.CommandTimeoutError do
     "command timed out after #{inspect(timeout)}ms: #{command}"
   end
 end
+
+defmodule Sanad.OutputsFailedError do
+  @moduledoc "Raised when `fail!` is called inside an `outputs` / `outputs!` block."
+  defexception [:scope, :reason]
+
+  def message(%{scope: scope, reason: nil}) do
+    "outputs block for scope #{inspect(scope)} called fail!"
+  end
+
+  def message(%{scope: scope, reason: reason}) do
+    "outputs block for scope #{inspect(scope)} called fail!: #{inspect(reason)}"
+  end
+end

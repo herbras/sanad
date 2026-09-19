@@ -50,11 +50,14 @@ defmodule Sanad.DSL do
 
       Module.register_attribute(__MODULE__, :sanad_steps, accumulate: true)
       Module.register_attribute(__MODULE__, :sanad_declared_scopes, accumulate: true)
+      Module.register_attribute(__MODULE__, :sanad_outputs, accumulate: true)
       Module.register_attribute(__MODULE__, :sanad_config, accumulate: false)
       Module.register_attribute(__MODULE__, :sanad_step_counter, accumulate: false)
       Module.register_attribute(__MODULE__, :sanad_scope, accumulate: false)
+      Module.register_attribute(__MODULE__, :sanad_outputs_kinds, accumulate: false)
 
       @sanad_config %{}
+      @sanad_outputs_kinds %{}
       @sanad_step_counter 0
       @sanad_scope nil
 
@@ -67,9 +70,65 @@ defmodule Sanad.DSL do
   keyword list; nested keyword lists are normalized to maps.
   """
   defmacro config(do: block) do
-    quote do
-      @sanad_config Sanad.Config.normalize(unquote(block))
+    case scoped_entries(block) do
+      nil ->
+        quote do
+          @sanad_config Sanad.Config.normalize(unquote(block))
+
+          @doc false
+          def __sanad_config_index__, do: Sanad.Config.Index.from_legacy(@sanad_config)
+        end
+
+      entries ->
+        quote do
+          @sanad_config Sanad.Config.Index.legacy_map(Sanad.Config.Index.build(unquote(entries)))
+
+          # Built on call, not stored: a compiled regex holds a reference,
+          # which cannot live in a module attribute.
+          @doc false
+          def __sanad_config_index__, do: Sanad.Config.Index.build(unquote(entries))
+        end
     end
+  end
+
+  # The scoped form is a block of `cog_type(opts)`, `cog_type(:name, opts)` or
+  # `cog_type(~r/pattern/, opts)` calls. Anything else — a map literal, a
+  # function call returning config — is the legacy value form. A block that
+  # mixes the two is rejected rather than guessed at.
+  defp scoped_entries(block) do
+    expressions =
+      case block do
+        {:__block__, _meta, expressions} -> expressions
+        single -> [single]
+      end
+
+    cond do
+      Enum.all?(expressions, &scoped_entry?/1) -> Enum.map(expressions, &scoped_entry/1)
+      Enum.any?(expressions, &scoped_entry?/1) -> raise_mixed_config!(expressions)
+      true -> nil
+    end
+  end
+
+  defp scoped_entry?({name, _meta, args})
+       when is_atom(name) and is_list(args) and length(args) in 1..2 do
+    Keyword.keyword?(List.last(args))
+  end
+
+  defp scoped_entry?(_expression), do: false
+
+  defp scoped_entry({name, _meta, [opts]}), do: quote(do: {unquote(name), nil, unquote(opts)})
+
+  defp scoped_entry({name, _meta, [scope, opts]}) do
+    quote(do: {unquote(name), unquote(scope), unquote(opts)})
+  end
+
+  defp raise_mixed_config!(expressions) do
+    offender = Enum.find(expressions, &(not scoped_entry?(&1)))
+
+    raise ArgumentError,
+          "config must be either a single value (a map or keyword list) or a block of " <>
+            "scoped declarations like `chat(:name, model: \"x\")`, not both; got: " <>
+            Macro.to_string(offender)
   end
 
   @doc "Declares the default (unnamed) execution scope."
@@ -129,6 +188,101 @@ defmodule Sanad.DSL do
 
     defmacro unquote(dsl_name)(step_name, value, opts) when is_list(opts) do
       add_step(__CALLER__, unquote(type), step_name, opts, value)
+    end
+  end
+
+  @doc """
+  Declares what the surrounding scope returns.
+
+  Without it, a scope returns the output of its last cog. At most one
+  `outputs` or `outputs!` per scope. The block runs after the scope's cogs
+  with `ctx` bound to the scope's own context, so `ctx.scope_value` and
+  `ctx.scope_index` are available:
+
+      execute :review_one do
+        chat(:draft) do "Review \#{ctx.scope_value}" end
+        cmd(:lint, "mix credo")
+
+        outputs do
+          %{draft: chat!(ctx, :draft).response, lint: cmd!(ctx, :lint).status}
+        end
+      end
+
+  `skip!` and `next!` inside the block make the scope's value `nil`;
+  `break!` does too and ends the enclosing loop; `fail!` raises
+  `Sanad.OutputsFailedError`.
+
+  Reading a cog that was skipped or never ran — the usual case after a
+  `break!` — is swallowed here and makes the value `nil`, so callers need no
+  guard code. Use `outputs!` when you would rather those reads raise.
+  """
+  defmacro outputs(do: block), do: define_outputs(__CALLER__, :outputs, block)
+
+  defmacro outputs(other) do
+    raise ArgumentError, "outputs requires a do block, got: #{Macro.to_string(other)}"
+  end
+
+  @doc """
+  Strict `outputs/1`: reading a cog that was skipped or never ran raises
+  instead of making the scope's value `nil`.
+  """
+  defmacro outputs!(do: block), do: define_outputs(__CALLER__, :outputs!, block)
+
+  defmacro outputs!(other) do
+    raise ArgumentError, "outputs! requires a do block, got: #{Macro.to_string(other)}"
+  end
+
+  defp define_outputs(caller, kind, block) do
+    scope = claim_outputs!(caller, kind)
+    counter = Module.get_attribute(caller.module, :sanad_step_counter) || 0
+    Module.put_attribute(caller.module, :sanad_step_counter, counter + 1)
+    fun_name = :"__sanad_outputs_#{counter}__"
+
+    fun_def =
+      if ctx_used?(block) do
+        quote do
+          @doc false
+          def unquote(fun_name)(ctx) do
+            var!(ctx) = ctx
+            unquote(block)
+          end
+        end
+      else
+        quote do
+          @doc false
+          def unquote(fun_name)(_ctx) do
+            unquote(block)
+          end
+        end
+      end
+
+    quote do
+      unquote(fun_def)
+
+      @sanad_outputs {unquote(scope),
+                      %{kind: unquote(kind), fun: {__MODULE__, unquote(fun_name)}}}
+    end
+  end
+
+  # Claimed at expansion time, so a second declaration reports its own line.
+  # The accumulating `@sanad_outputs` is still empty while macros expand.
+  defp claim_outputs!(caller, kind) do
+    scope = Module.get_attribute(caller.module, :sanad_scope)
+    claimed = Module.get_attribute(caller.module, :sanad_outputs_kinds) || %{}
+
+    case Map.get(claimed, scope) do
+      nil ->
+        Module.put_attribute(caller.module, :sanad_outputs_kinds, Map.put(claimed, scope, kind))
+        scope
+
+      existing ->
+        raise CompileError,
+          file: caller.file,
+          line: caller.line,
+          description:
+            "#{kind} declared for scope #{inspect(scope)} of #{inspect(caller.module)}, " <>
+              "but #{existing} was already declared for it; " <>
+              "at most one outputs/outputs! per execute scope"
     end
   end
 
@@ -221,6 +375,11 @@ defmodule Sanad.DSL do
       @doc false
       def __sanad_config__, do: @sanad_config
 
+      unless Module.defines?(__MODULE__, {:__sanad_config_index__, 0}) do
+        @doc false
+        def __sanad_config_index__, do: Sanad.Config.Index.from_legacy(@sanad_config)
+      end
+
       @doc false
       def __sanad_scopes__ do
         scopes =
@@ -235,6 +394,9 @@ defmodule Sanad.DSL do
 
       @doc false
       def __sanad_steps__, do: Map.get(__sanad_scopes__(), nil, [])
+
+      @doc false
+      def __sanad_outputs__, do: Map.new(@sanad_outputs)
     end
   end
 

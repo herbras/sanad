@@ -12,7 +12,7 @@ defmodule Sanad.Runner do
   can implement Roast semantics.
   """
 
-  alias Sanad.{Cog, Config, Context}
+  alias Sanad.{Cog, Config, Context, Events}
 
   @typedoc "Signal returned by `run_steps/2` to the enclosing scope."
   @type control :: :ok | :next | :break
@@ -23,13 +23,28 @@ defmodule Sanad.Runner do
   def run(module, opts) when is_atom(module) do
     ctx = %Context{
       config: Config.normalize(module.__sanad_config__()),
+      config_index: config_index(module),
       params: Keyword.get(opts, :params, %{}),
       workflow_dir: Keyword.get(opts, :workflow_dir, File.cwd!()),
-      module: module
+      module: module,
+      run_id: Keyword.get(opts, :run_id) || make_ref()
     }
 
-    {ctx, _control} = run_steps(module.__sanad_steps__(), ctx)
-    ctx
+    meta = %{module: module, params: ctx.params, workflow_dir: ctx.workflow_dir}
+    span = Events.span_start(ctx, :workflow, meta)
+
+    try do
+      steps = module.__sanad_steps__()
+      {ctx, control} = run_steps(steps, ctx)
+      {output, _control} = scope_output(module, nil, steps, ctx, control)
+      ctx = %{ctx | final_output: output}
+      Events.span_stop(ctx, :workflow, span, Map.put(meta, :statuses, ctx.statuses))
+      ctx
+    rescue
+      error ->
+        Events.span_exception(ctx, :workflow, span, :error, error, __STACKTRACE__, meta)
+        reraise error, __STACKTRACE__
+    end
   end
 
   def run(path, opts) when is_binary(path) do
@@ -64,22 +79,36 @@ defmodule Sanad.Runner do
   step's output (nil when the scope was skipped/ended early), matching
   upstream Roast's default final output.
   """
-  @spec run_scope(Context.t(), atom(), term(), non_neg_integer()) ::
+  @spec run_scope(Context.t(), atom(), term(), non_neg_integer(), keyword()) ::
           {term(), Context.t(), control()}
-  def run_scope(%Context{} = parent, scope, value, index \\ 0) when is_atom(scope) do
+  def run_scope(%Context{} = parent, scope, value, index \\ 0, opts \\ []) when is_atom(scope) do
     steps = fetch_scope!(parent, scope)
 
-    child = %{
-      parent
-      | outputs: %{},
-        statuses: %{},
-        failures: %{},
-        scope_value: value,
-        scope_index: index
-    }
+    child =
+      %{
+        parent
+        | outputs: %{},
+          statuses: %{},
+          failures: %{},
+          scope_value: value,
+          scope_index: index,
+          final_output: nil
+      }
+      |> Events.push_scope(scope, index)
 
-    {ctx, control} = run_steps(steps, child)
-    {final_output(steps, ctx), ctx, control}
+    meta = %{scope: scope, index: index, scope_value: value}
+    span = Events.span_start(child, :scope, meta, Keyword.get(opts, :span_context))
+
+    try do
+      {ctx, control} = run_steps(steps, child)
+      {output, control} = scope_output(parent.module, scope, steps, ctx, control)
+      Events.span_stop(ctx, :scope, span, Map.merge(meta, %{control: control, output: output}))
+      {output, ctx, control}
+    rescue
+      error ->
+        Events.span_exception(child, :scope, span, :error, error, __STACKTRACE__, meta)
+        reraise error, __STACKTRACE__
+    end
   end
 
   defp fetch_scope!(%Context{module: nil}, scope) do
@@ -93,33 +122,125 @@ defmodule Sanad.Runner do
     end
   end
 
-  defp final_output(steps, ctx) do
+  # A scope returns whatever its `outputs` block returns, or, with no such
+  # block, the output of its last cog. `outputs` can also end the enclosing
+  # loop, so it may upgrade the control signal to `:break`.
+  defp scope_output(module, scope, steps, %Context{} = ctx, control) do
+    case outputs_spec(module, scope) do
+      nil ->
+        {last_output(steps, ctx), control}
+
+      spec ->
+        case eval_outputs(spec, scope, steps, ctx) do
+          {output, :break} -> {output, :break}
+          {output, _} -> {output, control}
+        end
+    end
+  end
+
+  defp outputs_spec(nil, _scope), do: nil
+
+  defp outputs_spec(module, scope) do
+    if function_exported?(module, :__sanad_outputs__, 0) do
+      Map.get(module.__sanad_outputs__(), scope)
+    end
+  end
+
+  # Upstream swallows reads of cogs that were skipped or never ran, so a
+  # scope ended by `break!` needs no guard code. Reads of a cog that *failed*
+  # are not swallowed — upstream leaves that error out of its rescue list.
+  #
+  # A name this scope never declared is a typo and always raises, even from
+  # the lenient `outputs`. The error's own outputs map is compared as well,
+  # so a missing output read out of a nested scope's context is not mistaken
+  # for one of this scope's own names.
+  defp eval_outputs(%{kind: kind, fun: fun}, scope, steps, ctx) do
+    declared = MapSet.new(steps, & &1.name)
+
+    try do
+      {eval_fun(fun, ctx), :ok}
+    rescue
+      error in Sanad.OutputNotFoundError ->
+        own_read? = MapSet.member?(declared, error.name) and error.outputs == ctx.outputs
+
+        if kind == :outputs and own_read? do
+          {nil, :ok}
+        else
+          reraise error, __STACKTRACE__
+        end
+
+      error in Sanad.CogSkippedError ->
+        if kind == :outputs, do: {nil, :ok}, else: reraise(error, __STACKTRACE__)
+    catch
+      {:sanad_control, :break, _message} ->
+        {nil, :break}
+
+      {:sanad_control, kind, _message} when kind in [:skip, :next] ->
+        {nil, :ok}
+
+      {:sanad_control, :fail, message} ->
+        raise Sanad.OutputsFailedError, scope: scope, reason: message
+    end
+  end
+
+  defp last_output(steps, ctx) do
     case List.last(steps) do
       nil -> nil
       %{name: name} -> Map.get(ctx.outputs, name)
     end
   end
 
+  defp config_index(module) do
+    if function_exported?(module, :__sanad_config_index__, 0) do
+      module.__sanad_config_index__()
+    else
+      Sanad.Config.Index.from_legacy(module.__sanad_config__())
+    end
+  end
+
   defp execute_step(%{type: type, name: name, opts: opts, fun: fun}, ctx) do
-    opts = normalize_opts(opts)
+    # Workflow config is resolved here, the one place that knows both the
+    # cog's type and its name, so every cog receives one already-merged
+    # keyword list and the step's own options still win.
+    opts = Config.resolve(ctx.config_index, type, name, normalize_opts(opts))
     started = System.monotonic_time(:millisecond)
+
+    # The cog element is appended for the duration of this step only: the input
+    # block and the cog see it (so nested scopes hang off it), while the outer
+    # context keeps recording outputs one level up.
+    cog_ctx = Events.push_cog(ctx, type, name)
+    meta = %{type: type, name: name, opts: opts}
+    span = Events.span_start(cog_ctx, :cog, meta)
 
     result =
       try do
-        input = eval_fun(fun, ctx)
+        input = eval_fun(fun, cog_ctx)
         cog = fetch_cog!(type)
-        {:ok, Cog.run(cog, input, opts, ctx)}
+        {:ok, Cog.run(cog, input, opts, cog_ctx)}
+      rescue
+        error ->
+          Events.span_exception(cog_ctx, :cog, span, :error, error, __STACKTRACE__, meta)
+          reraise error, __STACKTRACE__
       catch
         {:sanad_control, kind, message} -> {:control, kind, message}
       end
 
     elapsed = System.monotonic_time(:millisecond) - started
 
+    # Emitted before `handle_result/4`, which raises when a `fail!` aborts the
+    # workflow; otherwise an aborting step would never report how it ended.
+    Events.span_stop(cog_ctx, :cog, span, Map.put(meta, :status, status_of(result)))
+
     case handle_result(result, name, opts, ctx) do
       {:cont, ctx} -> {:cont, Context.put_timing(ctx, name, elapsed)}
       {:halt, ctx, control} -> {:halt, Context.put_timing(ctx, name, elapsed), control}
     end
   end
+
+  defp status_of({:ok, _output}), do: :ok
+  defp status_of({:control, :skip, _message}), do: :skipped
+  defp status_of({:control, :fail, _message}), do: :failed
+  defp status_of({:control, kind, _message}), do: kind
 
   defp handle_result({:ok, output}, name, _opts, ctx) do
     {:cont, Context.put(ctx, name, output)}

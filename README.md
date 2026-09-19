@@ -32,11 +32,11 @@ MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow 
 | Cmd: stdout/stderr terpisah, `cwd`, `env`, `timeout`, `fail_on_error` | Ya |
 | CLI: `mix sanad.execute` + escript `sanad`, `--module`, `--param` | Ya |
 | Ringkasan run (status dan durasi per cog) | Ya |
-| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 77 tes |
-| Event monitor setara Roast | Belum |
-| Scope `outputs { }` / `outputs! { }` | Belum |
-| Config per-nama/regex (`chat(:x) do ... end`) | Belum |
-| Streaming, JSON mode/tools, session normalization penuh | Belum |
+| Tes ExUnit offline (Req.Test, stub CLI, E2E subprocess) | 123 tes |
+| Event run (span workflow/scope/cog, stdout/stderr, block) + renderer ala Roast | Ya |
+| Scope `outputs` / `outputs!` | Ya |
+| Config per-nama dan regex (`chat(:x, ...)`, `chat(~r/.../, ...)`) | Ya |
+| Streaming chat, JSON mode/tools, session normalization penuh | Belum |
 | Tutorial 1-9, publish Hex | Ditunda |
 
 ## Install
@@ -117,6 +117,61 @@ repeat_cog :name, scope: :one_iteration, max_iterations: 10 do initial_value end
 chat :name do "prompt" end
 agent :name do "prompt" end
 ```
+
+### Nilai balik scope
+
+```elixir
+execute :review_one do
+  elixir_cog(:draft, do: String.upcase(ctx.scope_value))
+
+  outputs do
+    %{item: ctx.scope_value, draft: output!(ctx, :draft)}
+  end
+end
+```
+
+Tanpa `outputs`, sebuah scope mengembalikan output cog terakhirnya. Dengan
+`outputs`, nilai itulah yang diterima `call`, tiap iterasi `map`, dan tiap
+iterasi `repeat` (termasuk yang diteruskan ke iterasi berikutnya).
+
+`skip!` dan `next!` di dalam blok membuat nilainya `nil`; `break!` juga, sambil
+mengakhiri loop; `fail!` melempar `Sanad.OutputsFailedError`. Membaca cog yang
+tidak sempat jalan karena `break!` ditelan (nilainya `nil`) supaya pemanggil
+tidak perlu kode penjaga — pakai `outputs!` kalau ingin dilempar. Nama yang
+tidak pernah dideklarasikan di scope itu selalu melempar, karena itu typo.
+
+### Config per nama dan pola
+
+```elixir
+config do
+  global(abort_on_failure: true)
+  chat(provider: :openai, model: "gpt-4o-mini")
+  chat(~r/^review_/, temperature: 0.0)
+  chat(:summary, model: "gpt-4o")
+end
+```
+
+Urutan merge, dari paling umum ke paling khusus: `global`, config umum per tipe
+cog, semua pola yang cocok dengan nama cog (sesuai urutan penulisan), nama
+persis, lalu opsi step yang tetap menang. Bentuk map yang lama tetap berlaku dan
+tidak berubah artinya.
+
+### Event run
+
+Selama workflow jalan, CLI mencetak jejaknya ke stderr:
+
+```
+🔥🔥🔥 Workflow Starting
+cmd(:echo) Starting
+cmd(:echo) ❯ hello
+map(:lengths) -> {:string_length}[2] Complete
+🔥🔥🔥 Workflow Complete
+```
+
+Event dipancarkan lewat `:telemetry` dengan nama `[:sanad, :workflow | :scope |
+:cog, :start | :stop | :exception]` plus `[:sanad, :cog, :stdout | :stderr |
+:block | :log]`. Pasang handler sendiri lewat `Sanad.Event.names/0`, atau
+matikan renderer bawaan dengan `--quiet`.
 
 ### Chat providers
 
@@ -221,9 +276,8 @@ Semua tes offline:
 - `ruby` diganti `elixir_cog` yang mengembalikan nilai mentah. Tidak ada evaluasi string Ruby.
 - Agent satu prompt per step. Upstream bisa multi-prompt dan merantai sesi. Opsi `:fork_session` untuk claude tersedia, default `true` saat `:session` diisi.
 - Chat menambah `system_prompt`, `max_tokens`, `temperature`, retry, timeout, `PERPLEXITY_API_BASE`, dan override `base_url`/`api_key`/`key_env`. Upstream lebih minim.
-- `outputs { }` dan `outputs! { }` untuk nilai balik scope belum ada. Default-nya output cog terakhir.
-- Config per-nama atau regex ala Roast (`chat(:x) do ... end`) belum ada. Pakai opsi step.
-- Event rendering Roast (glyph dan block events) belum direplikasi. Sanad punya ringkasan run.
+- Event dipancarkan lewat `:telemetry`, bukan satu proses monitor dengan antrean. Konsekuensinya tidak ada urutan global: event dari iterasi `map` paralel saling menyela, dan hanya event satu path yang terurut penuh. Span cog di dalam iterasi yang di-*kill* `break!` tidak tertutup; scope di atasnya ditutup dengan `control: :cancelled`.
+- Config per-nama memakai `chat(:x, model: "...")`, bukan blok `chat(:x) do ... end` — Elixir tidak punya receiver implisit, dan `instance_eval` tidak diport (keputusan D2).
 - Heuristik `MaxTokensExceededError` dari upstream tidak direplikasi.
 - `cmd :timeout` adalah tambahan Sanad, upstream tidak punya.
 

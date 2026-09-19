@@ -73,32 +73,34 @@ Gate: `bin/mix test` hijau di mesin tanpa Elixir. PASSED, 77 tests.
 
 Acuan upstream: `lib/roast/event.rb`, `event_monitor.rb`, `task_context.rb`, `output_router.rb`.
 
-- [ ] E1 `Sanad.Event` plus path runtime (`chat(:x) -> {:scope}[0]`), termasuk propagasi lintas proses di `map` paralel.
-- [ ] E2 Dispatch event dan handler yang bisa dipasang: renderer CLI, collector tes.
-- [ ] E3 Emisi `begin`/`end` per cog di runner, `stdout`/`stderr` dari cmd, `block` untuk prompt dan response.
-- [ ] E4 Hubungan dengan `Sanad.Summary`: ringkasan diturunkan dari event, bukan jalur terpisah.
+- [x] E1 `Sanad.Event` plus path runtime (`chat(:x) -> {:scope}[0]`). Path hidup di `Sanad.Context`, jadi ikut tersalin ke proses anak `map`.
+- [x] E2 Dispatch lewat `:telemetry` (sudah ada di `mix.lock` via finch/plug), renderer CLI, collector tes.
+- [x] E3 Span start/stop/exception per workflow, scope, dan cog; `stdout` streaming dari cmd, `stderr`, `block` untuk prompt dan response.
+- [ ] E4 `Sanad.Summary` diturunkan dari event. Ditunda: ringkasan sekarang masih dari `ctx.statuses`, jadi hanya mencakup scope teratas.
 
-Gate: tes urutan event untuk scope nested, perilaku saat `break!`, dan E2E yang mengecek format path.
+Gate: PASSED, 95 tests. Tes urutan event untuk scope nested, penutupan span saat `break!`, dan E2E yang mengecek format path plus `--quiet`.
+
+Keputusan yang diambil di slice ini: tidak ada proses monitor dengan antrean. Konsekuensinya tidak ada urutan global; tes hanya boleh menegaskan urutan dalam satu path. Span cog di dalam iterasi yang di-kill tetap terbuka, dan itu didokumentasikan sebagai invarian.
 
 ## Slice F: scope outputs
 
 Acuan upstream: `execution_manager.rb` (`bind_outputs`, `compute_final_output`).
 
-- [ ] F1 `outputs do ... end` dan `outputs! do ... end` sebagai metadata scope, satu per scope.
-- [ ] F2 Nilai akhir untuk top-level, `call`, tiap child `map`, tiap iterasi `repeat`.
-- [ ] F3 Semantik swallow: `skip!`/`next!` jadi `nil`, `fail!` tetap raise, akses output skipped/not-run ditelan `outputs` tapi dilempar `outputs!`.
+- [x] F1 `outputs do ... end` dan `outputs! do ... end` sebagai metadata scope, satu per scope (dobel = CompileError).
+- [x] F2 Nilai akhir untuk top-level (`ctx.final_output`), `call`, tiap child `map`, tiap iterasi `repeat`.
+- [x] F3 Semantik swallow: `skip!`/`next!` jadi `nil`, `break!` juga sambil mengakhiri loop, `fail!` melempar `OutputsFailedError`; akses output skipped/not-run ditelan `outputs` tapi dilempar `outputs!`. Nama yang tidak dideklarasikan selalu dilempar.
 
-Gate: scope tanpa `outputs` berperilaku persis seperti sekarang; test/nested_test.exs tidak berubah hasilnya.
+Gate: PASSED, 108 tests. test/nested_test.exs tidak diubah dan tetap hijau.
 
 ## Slice G: config per-nama dan regex
 
 Acuan upstream: `config_manager.rb` (`config_for`).
 
-- [ ] G1 Surface config bernama dan regex, tanpa merusak bentuk map yang sekarang.
-- [ ] G2 Urutan merge: global, general per-cog, semua regex yang match (berurutan), nama persis, lalu opsi step.
-- [ ] G3 Validasi nilai per scope config dengan `InvalidConfigError`.
+- [x] G1 `config do global(...); chat(:x, ...); chat(~r/.../, ...) end`, dipilih lewat bentuk AST; bentuk map lama tetap jalan, blok campuran ditolak.
+- [x] G2 Urutan merge: global, general per-cog, semua regex yang match (urutan penulisan), nama persis, lalu opsi step.
+- [ ] G3 Preflight validasi sebelum step pertama jalan. Ditunda: validasi masih terjadi saat cog jalan, sama seperti upstream.
 
-Gate: semua contoh di README dan `examples/` resolve identik; tes prioritas merge lengkap.
+Gate: PASSED, 123 tests. Semua contoh dan snippet README resolve identik; `normalize/1` tidak lagi merusak opsi bernilai keyword list.
 
 ## Slice H: chat dan agent lanjutan
 

@@ -46,7 +46,11 @@ defmodule Sanad.Cogs.Chat do
   def run(prompt, opts, ctx) when is_binary(prompt) do
     cfg = Map.get(ctx.config, :chat, %{})
     provider = provider(opts, cfg)
-    model = Keyword.get(opts, :model) || Map.get(cfg, :model) || default_model(provider)
+
+    model =
+      (Keyword.get(opts, :model) || Map.get(cfg, :model) || default_model(provider))
+      |> expand_model()
+
     request = build_request(provider, model, prompt, opts, cfg)
 
     options =
@@ -79,7 +83,9 @@ defmodule Sanad.Cogs.Chat do
   end
 
   defp provider(opts, cfg) do
-    provider = Keyword.get(opts, :provider) || Map.get(cfg, :provider) || default_provider()
+    provider =
+      (Keyword.get(opts, :provider) || Map.get(cfg, :provider) || default_provider())
+      |> alias_provider()
 
     if provider in @providers do
       provider
@@ -89,6 +95,11 @@ defmodule Sanad.Cogs.Chat do
     end
   end
 
+  # `:claude` is what people call the models; Anthropic is what the API is
+  # called. Accept both.
+  defp alias_provider(:claude), do: :anthropic
+  defp alias_provider(other), do: other
+
   defp default_provider do
     case normalize_provider(System.get_env("SANAD_DEFAULT_CHAT_PROVIDER")) do
       nil ->
@@ -97,7 +108,7 @@ defmodule Sanad.Cogs.Chat do
       "openai" ->
         :openai
 
-      "anthropic" ->
+      provider when provider in ["anthropic", "claude"] ->
         :anthropic
 
       "gemini" ->
@@ -110,7 +121,7 @@ defmodule Sanad.Cogs.Chat do
         raise Sanad.InvalidConfigError,
           message:
             "invalid SANAD_DEFAULT_CHAT_PROVIDER: #{inspect(other)} " <>
-              "(expected openai | anthropic | gemini | perplexity)"
+              "(expected openai | anthropic | claude | gemini | perplexity)"
     end
   end
 
@@ -122,6 +133,34 @@ defmodule Sanad.Cogs.Chat do
       normalized -> normalized
     end
   end
+
+  # Short names for the current Claude models, so workflows do not carry long
+  # version strings around.
+  @model_aliases %{
+    opus: "claude-opus-5",
+    sonnet: "claude-sonnet-5",
+    haiku: "claude-haiku-4-5",
+    fable: "claude-fable-5-1"
+  }
+
+  @doc "Model aliases accepted by `:model`, e.g. `model: :opus`."
+  @spec model_aliases() :: %{atom() => String.t()}
+  def model_aliases, do: @model_aliases
+
+  defp expand_model(model) when is_atom(model) do
+    case Map.fetch(@model_aliases, model) do
+      {:ok, expanded} ->
+        expanded
+
+      :error ->
+        raise Sanad.InvalidConfigError,
+          message:
+            "unknown model alias #{inspect(model)}, " <>
+              "expected one of #{inspect(Map.keys(@model_aliases))} or a model string"
+    end
+  end
+
+  defp expand_model(model), do: model
 
   defp default_model(:openai), do: "gpt-4o-mini"
   defp default_model(:anthropic), do: "claude-haiku-4-5"

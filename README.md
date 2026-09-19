@@ -178,7 +178,7 @@ matikan renderer bawaan dengan `--quiet`.
 | provider | key env | base URL env |
 |---|---|---|
 | `:openai` | `OPENAI_API_KEY` | `OPENAI_API_BASE` |
-| `:anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_BASE` |
+| `:anthropic` (alias `:claude`) | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_BASE` |
 | `:gemini` | `GEMINI_API_KEY` | `GEMINI_API_BASE` |
 | `:perplexity` | `PERPLEXITY_API_KEY` | `PERPLEXITY_API_BASE` |
 
@@ -191,6 +191,17 @@ config do
             key_env: "OPENROUTER_API_KEY"}}
 end
 ```
+
+Model Claude punya alias pendek, jadi workflow tidak perlu menuliskan ID panjang:
+
+```elixir
+chat :summary, provider: :claude, model: :opus do
+  "Ringkas ini: \#{cmd!(ctx, :diff).stdout}"
+end
+```
+
+`:opus` → `claude-opus-5`, `:sonnet` → `claude-sonnet-5`, `:haiku` → `claude-haiku-4-5`,
+`:fable` → `claude-fable-5-1`. Alias yang tidak dikenal ditolak dengan daftar yang sah.
 
 Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_tokens`, `:api_key`, `:key_env`, `:base_url`, `:timeout`, `:max_retries`, `:req_options`. Request POST di-retry dengan `retry: :transient`. Error HTTP atau transport melempar `Sanad.ChatError` beserta status.
 

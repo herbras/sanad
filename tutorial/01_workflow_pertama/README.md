@@ -77,4 +77,4 @@ Itu butuh API key, misalnya `OPENAI_API_KEY` atau `ANTHROPIC_API_KEY`.
 
 Ubah `salam.exs` agar juga menjalankan `whoami` dan menyebut namamu di ucapan.
 
-Berikutnya: [Bab 2 - Merantai cog](../02_merantai_cog/)
+Berikutnya: [Bab 2 - Merantai cog](../02_merantai_cog/README.md)

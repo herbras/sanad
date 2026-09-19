@@ -66,4 +66,4 @@ collect(output!(ctx, :nilai)) |> Enum.reject(&is_nil/1)
 Tambahkan satu siswa yang jawabannya kosong, dan pakai `skip!` supaya siswa itu tidak ikut
 dihitung di rata-rata.
 
-Berikutnya: [Bab 8 - Perulangan](../08_perulangan/)
+Berikutnya: [Bab 8 - Perulangan](../08_perulangan/README.md)

@@ -60,4 +60,4 @@ lebih cepat, dan hasilnya pasti. AI dipakai hanya untuk bagian yang memang perlu
 
 Tambah satu langkah yang menghitung total seluruh stok, lalu sebutkan angkanya di hasil akhir.
 
-Berikutnya: [Bab 3 - Params](../03_params/)
+Berikutnya: [Bab 3 - Params](../03_params/README.md)

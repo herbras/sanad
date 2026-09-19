@@ -54,4 +54,4 @@ Kunci params selalu **teks**, bukan simbol. Jadi `Map.get(p, "nama")`, bukan
 
 Tambahkan params `tempat`, dan pastikan tetap jalan meski `tempat` tidak diisi.
 
-Berikutnya: [Bab 4 - Konfigurasi](../04_konfigurasi/)
+Berikutnya: [Bab 4 - Konfigurasi](../04_konfigurasi/README.md)

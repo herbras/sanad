@@ -72,4 +72,4 @@ pasti, bukan kira-kira.
 Ubah setoran bulanan jadi params, lalu bandingkan berapa bulan yang dibutuhkan untuk setoran
 300 ribu dan 700 ribu.
 
-Berikutnya: [Bab 9 - Paralel](../09_paralel/)
+Berikutnya: [Bab 9 - Paralel](../09_paralel/README.md)

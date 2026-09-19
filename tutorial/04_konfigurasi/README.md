@@ -89,4 +89,4 @@ membagi anggaran itu.
 
 Tambahkan `chat(~r/_draf$/, temperature: 0.9)` dan jelaskan langkah mana saja yang kena.
 
-Berikutnya: [Bab 5 - Kontrol alur](../05_kontrol_alur/)
+Berikutnya: [Bab 5 - Kontrol alur](../05_kontrol_alur/README.md)

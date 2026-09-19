@@ -196,7 +196,7 @@ Model Claude punya alias pendek, jadi workflow tidak perlu menuliskan ID panjang
 
 ```elixir
 chat :summary, provider: :claude, model: :opus do
-  "Ringkas ini: \#{cmd!(ctx, :diff).stdout}"
+  "Ringkas ini: #{cmd!(ctx, :diff).stdout}"
 end
 ```
 

@@ -218,6 +218,21 @@ Opsi per step: `:provider`, `:model`, `:system_prompt`, `:temperature`, `:max_to
 | `:opencode` | `opencode run <prompt>` | argv | teks |
 | `:agy` | `agy -p <prompt>` | argv | teks |
 
+Output agent berisi `response`, `session` (id percakapan provider, `nil` untuk provider tanpa
+konsep session), dan `stats`:
+
+```elixir
+out = agent!(ctx, :review)
+out.session                      # "sess-42" untuk pi, session_id untuk claude
+out.stats.num_turns              # jumlah giliran, nil kalau tidak dilaporkan
+out.stats.usage.input_tokens     # total token, plus output/cache_read/cache_write
+out.stats.usage.cost_usd         # biaya kalau provider melaporkannya
+out.stats.model_usage["pi-1"]    # rincian per model (pi)
+```
+
+Angka yang tidak dilaporkan provider bernilai `nil`, bukan `0`, supaya "tidak dilaporkan" tetap
+bisa dibedakan dari "nol".
+
 Default provider lewat `SANAD_DEFAULT_AGENT_PROVIDER`. `cd` default-nya `workflow_dir`. Binary yang tidak ketemu melempar `Sanad.MissingExecutableError`. Opsi: `:model`, `:system_prompt`, `:append_system_prompt`, `:session`, `:fork_session`, `:skip_permissions`, `:command`, `:env`, `:timeout`.
 
 ### Control flow

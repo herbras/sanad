@@ -13,9 +13,60 @@ defmodule Sanad.Output do
     defstruct stdout: "", stderr: "", status: 0
   end
 
+  defmodule Agent.Usage do
+    @moduledoc """
+    Token usage for an agent run, and its cost when the provider reports one.
+
+    Fields are `nil` rather than zero when the provider says nothing about
+    them, so "not reported" stays distinguishable from "none used".
+    """
+
+    defstruct input_tokens: nil,
+              output_tokens: nil,
+              cache_read_tokens: nil,
+              cache_write_tokens: nil,
+              cost_usd: nil
+
+    @type t :: %__MODULE__{
+            input_tokens: non_neg_integer() | nil,
+            output_tokens: non_neg_integer() | nil,
+            cache_read_tokens: non_neg_integer() | nil,
+            cache_write_tokens: non_neg_integer() | nil,
+            cost_usd: float() | nil
+          }
+  end
+
+  defmodule Agent.Stats do
+    @moduledoc """
+    What an agent run cost, normalized across providers.
+
+    `usage` is the total; `model_usage` breaks it down by model for providers
+    that report per-model figures.
+    """
+
+    defstruct num_turns: nil, usage: %Agent.Usage{}, model_usage: %{}
+
+    @type t :: %__MODULE__{
+            num_turns: non_neg_integer() | nil,
+            usage: Agent.Usage.t(),
+            model_usage: %{optional(String.t()) => Agent.Usage.t()}
+          }
+  end
+
   defmodule Agent do
-    @moduledoc "Output of the agent cog."
-    defstruct response: "", provider: :pi, raw: %{}
+    @moduledoc """
+    Output of the agent cog.
+
+    `session` is the provider's conversation id when it has one, so a later
+    agent step can resume from it. It is `nil` for providers with no session
+    concept.
+    """
+
+    defstruct response: "",
+              provider: :pi,
+              session: nil,
+              stats: %Agent.Stats{},
+              raw: %{}
   end
 
   defmodule MapResult do

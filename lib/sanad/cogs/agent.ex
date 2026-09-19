@@ -33,6 +33,7 @@ defmodule Sanad.Cogs.Agent do
   alias Sanad.Events
   alias Sanad.Context
   alias Sanad.Output.Agent
+  alias Sanad.Output.Agent.{Stats, Usage}
 
   @providers [:pi, :claude, :opencode, :agy]
 
@@ -61,6 +62,8 @@ defmodule Sanad.Cogs.Agent do
         %Agent{
           response: response,
           provider: provider,
+          session: session_id(provider, stdout),
+          stats: stats(provider, stdout),
           raw: %{status: 0, session: session_id(provider, stdout), stderr: stderr}
         }
 
@@ -308,6 +311,86 @@ defmodule Sanad.Cogs.Agent do
 
   defp assistant_text(_message), do: nil
 
+  # Providers report usage in their own shapes; this is the one place that
+  # knows each of them, so workflows see one struct.
+  defp stats(:pi, stdout) do
+    events = decode_lines(stdout)
+
+    model_usage =
+      Enum.reduce(events, %{}, fn
+        %{"type" => "message_end", "message" => %{"usage" => usage, "model" => model}}, acc
+        when is_map(usage) and is_binary(model) ->
+          Map.update(acc, model, pi_usage(usage), &add_usage(&1, pi_usage(usage)))
+
+        _event, acc ->
+          acc
+      end)
+
+    turns = Enum.count(events, &(&1["type"] == "turn_start"))
+
+    %Stats{
+      num_turns: if(turns > 0, do: turns),
+      usage: model_usage |> Map.values() |> total_usage(),
+      model_usage: model_usage
+    }
+  end
+
+  defp stats(:claude, stdout) do
+    stdout
+    |> decode_lines()
+    |> Enum.reduce(%Stats{}, fn
+      %{"type" => "result"} = event, stats ->
+        %{
+          stats
+          | num_turns: event["num_turns"] || stats.num_turns,
+            usage: claude_usage(event)
+        }
+
+      _event, stats ->
+        stats
+    end)
+  end
+
+  defp stats(_provider, _stdout), do: %Stats{}
+
+  defp pi_usage(usage) do
+    %Usage{
+      input_tokens: usage["input"],
+      output_tokens: usage["output"],
+      cache_read_tokens: usage["cacheRead"],
+      cache_write_tokens: usage["cacheWrite"],
+      cost_usd: get_in(usage, ["cost", "total"])
+    }
+  end
+
+  defp claude_usage(%{"usage" => usage} = event) when is_map(usage) do
+    %Usage{
+      input_tokens: usage["input_tokens"],
+      output_tokens: usage["output_tokens"],
+      cache_read_tokens: usage["cache_read_input_tokens"],
+      cache_write_tokens: usage["cache_creation_input_tokens"],
+      cost_usd: event["total_cost_usd"]
+    }
+  end
+
+  defp claude_usage(event), do: %Usage{cost_usd: event["total_cost_usd"]}
+
+  defp total_usage([]), do: %Usage{}
+  defp total_usage(usages), do: Enum.reduce(usages, &add_usage/2)
+
+  defp add_usage(left, right) do
+    %Usage{
+      input_tokens: add(left.input_tokens, right.input_tokens),
+      output_tokens: add(left.output_tokens, right.output_tokens),
+      cache_read_tokens: add(left.cache_read_tokens, right.cache_read_tokens),
+      cache_write_tokens: add(left.cache_write_tokens, right.cache_write_tokens),
+      cost_usd: add(left.cost_usd, right.cost_usd)
+    }
+  end
+
+  defp add(nil, nil), do: nil
+  defp add(left, right), do: (left || 0) + (right || 0)
+
   defp session_id(:pi, stdout) do
     stdout
     |> decode_lines()
@@ -317,6 +400,16 @@ defmodule Sanad.Cogs.Agent do
     end)
   end
 
+  defp session_id(:claude, stdout) do
+    stdout
+    |> decode_lines()
+    |> Enum.find_value(fn
+      %{"session_id" => id} when is_binary(id) -> id
+      _ -> nil
+    end)
+  end
+
+  # opencode and agy have no session concept: they answer one prompt and exit.
   defp session_id(_provider, _stdout), do: nil
 
   defp decode_lines(stdout) do

@@ -47,6 +47,57 @@ defmodule Sanad.Cogs.AgentTest do
     assert pwd == dir or pwd == Path.join("/private", dir)
   end
 
+  test "pi: turns and per-model usage are normalized into stats", %{dir: dir} do
+    stub_path =
+      stub(dir, "pi", """
+      cat > /dev/null
+      printf '%s\\n' '{"type":"session","version":3,"id":"sess-7"}'
+      printf '%s\\n' '{"type":"turn_start"}'
+      printf '%s\\n' '{"type":"message_end","message":{"role":"assistant","model":"pi-1","usage":{"input":10,"output":4,"cacheRead":2,"cost":{"total":0.5}},"content":[{"type":"text","text":"A"}]}}'
+      printf '%s\\n' '{"type":"turn_start"}'
+      printf '%s\\n' '{"type":"message_end","message":{"role":"assistant","model":"pi-1","usage":{"input":6,"output":3,"cost":{"total":0.25}},"content":[{"type":"text","text":"B"}]}}'
+      """)
+
+    out = Sanad.Cogs.Agent.run("hi", [command: [stub_path]], ctx(dir))
+
+    assert out.session == "sess-7"
+    assert out.stats.num_turns == 2
+    assert out.stats.usage.input_tokens == 16
+    assert out.stats.usage.output_tokens == 7
+    assert out.stats.usage.cache_read_tokens == 2
+    assert out.stats.usage.cost_usd == 0.75
+    assert out.stats.model_usage["pi-1"].input_tokens == 16
+  end
+
+  test "a provider that reports no usage leaves the figures nil", %{dir: dir} do
+    stub_path = stub(dir, "opencode", "printf 'plain answer\\n'")
+
+    out = Sanad.Cogs.Agent.run("hi", [provider: :opencode, command: [stub_path]], ctx(dir))
+
+    assert out.session == nil
+    assert out.stats.num_turns == nil
+    assert out.stats.usage.input_tokens == nil
+    assert out.stats.model_usage == %{}
+  end
+
+  test "claude: session id, turns and usage come off the result event", %{dir: dir} do
+    stub_path =
+      stub(dir, "claude", """
+      cat > /dev/null
+      printf '%s\\n' '{"type":"system","subtype":"init","session_id":"claude-sess"}'
+      printf '%s\\n' '{"type":"result","subtype":"success","is_error":false,"result":"OK","num_turns":3,"total_cost_usd":0.125,"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":5}}'
+      """)
+
+    out = Sanad.Cogs.Agent.run("hi", [provider: :claude, command: [stub_path]], ctx(dir))
+
+    assert out.session == "claude-sess"
+    assert out.stats.num_turns == 3
+    assert out.stats.usage.input_tokens == 100
+    assert out.stats.usage.output_tokens == 20
+    assert out.stats.usage.cache_read_tokens == 5
+    assert out.stats.usage.cost_usd == 0.125
+  end
+
   test "claude: stream-json result parsed", %{dir: dir} do
     stub_path =
       stub(dir, "claude", """

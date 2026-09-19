@@ -23,6 +23,15 @@ Ditunda, bukan bagian "selesai" sekarang: tutorial 1-9, publish Hex, dan render 
 | D7 | Agent cog: invocation benar dulu (prompt via stdin, flag pi/claude upstream, `cd` sama dengan workflow_dir, error jelas). Parsing stats penuh masuk P2. |
 | D8 | Tes wajib offline (`Req.Test`, stub CLI). Live smoke test opsional lewat env var. |
 | D9 | Hygiene: git init dan commit per slice, LICENSE MIT, `.gitignore`, `.formatter.exs`. README bahasa Indonesia, docs kode bahasa Inggris. |
+| D10 | Toolchain lewat container (`bin/mix`), karena mesin kerja sekarang tidak punya Elixir di PATH. |
+| D11 | Event dipancarkan lewat `:telemetry` tanpa proses monitor. Tidak ada urutan global; path event hidup di `Sanad.Context` supaya selamat menyeberang `Task.Supervisor`. |
+
+## Keputusan yang masih perlu persetujuan
+
+| # | Pertanyaan | Rekomendasi |
+|---|---|---|
+| Q1 | Pasang skill "TypeSafe" (`typesafe-ai/skills`) ke setup Claude Code? | Belum. Instruksinya datang dari teks tempelan, bukan dari repo ini, dan skill itu berorientasi TypeScript sementara repo ini Elixir. Perlu konfirmasi eksplisit sebelum menyentuh `~/.claude`. |
+| Q2 | Urutan UI: setelah Slice G, mulai dari `--events jsonl`, lalu bridge OpenTelemetry, lalu laporan HTML satu berkas. | Setuju dulu sebelum skema event dianggap permukaan publik. |
 
 ## Slice A: foundation
 
@@ -109,6 +118,23 @@ Gate: PASSED, 123 tests. Semua contoh dan snippet README resolve identik; `norma
 - [ ] H3 Normalisasi session lintas provider agent.
 
 Gate: `Req.Test` untuk stream chunked dan tool call; stub CLI untuk session round-trip.
+
+## Slice J: dukungan kelas satu untuk pi dan model Claude
+
+Keadaan sekarang: `pi` sudah provider agent default (`pi --mode json -p`, `--fork`, parser
+protokol JSON), dan Anthropic sudah provider chat. Yang kurang adalah kelas satunya.
+
+- [ ] J1 Alias `provider: :claude` untuk chat Anthropic, plus default model yang masuk akal
+      (`claude-opus-5` untuk kerja berat, `claude-haiku-4-5` untuk yang murah) dan alias model
+      pendek supaya workflow tidak menuliskan ID panjang.
+- [ ] J2 Parity pi: normalisasi session lintas provider (lihat H3), plus stats dan usage
+      (token, biaya) dari protokol pi masuk ke `%Sanad.Output.Agent{}`. Acuan upstream:
+      `lib/roast/cogs/agent/stats.rb` dan `usage.rb`.
+- [ ] J3 Smoke test live opsional di balik env (`SANAD_LIVE=1`): satu panggilan pi asli dan satu
+      panggilan Anthropic asli. Tidak jalan di CI, tidak memblokir gate offline (keputusan D8).
+
+Gate: workflow contoh yang memakai `agent(:x)` dengan pi dan `chat(:y)` dengan Claude jalan tanpa
+konfigurasi tambahan selain API key; tes offline tetap hijau.
 
 ## Slice I: rilis (ditunda sampai diminta)
 

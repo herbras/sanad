@@ -129,6 +129,21 @@ defmodule ChatToolsTest do
       assert tool["name"] == "get_weather"
     end
 
+    test "a request without tools carries no tool fields at all" do
+      parent = self()
+
+      run(
+        [],
+        :tools_absent,
+        echo_body(parent, %{"choices" => [%{"message" => %{"content" => "ok"}}]})
+      )
+
+      assert_received {:body, body}
+      refute Map.has_key?(body, "tools")
+      refute Map.has_key?(body, "tool_choice")
+      refute Map.has_key?(body, "response_format")
+    end
+
     test "a tool without a name is refused before any request" do
       assert_raise Sanad.InvalidConfigError, ~r/needs a :name/, fn ->
         run([tools: [%{description: "nameless"}]], :tools_bad, fn conn ->

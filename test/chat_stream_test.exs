@@ -51,6 +51,24 @@ defmodule ChatStreamTest do
       assert {["a", "b"], ""} = Stream.decode(:gemini, "", chunk)
     end
 
+    test "handles CRLF line endings, which real servers send" do
+      chunk = "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\r\n\r\n"
+
+      assert {["hi"], _rest} = Stream.decode(:openai, "", chunk)
+    end
+
+    test "a chunk ending exactly on a newline leaves nothing buffered" do
+      chunk = ~s(data: {"choices":[{"delta":{"content":"a"}}]}\n)
+
+      assert {["a"], ""} = Stream.decode(:openai, "", chunk)
+    end
+
+    test "keeps whitespace inside a delta" do
+      chunk = ~s(data: {"choices":[{"delta":{"content":"  spasi  "}}]}\n)
+
+      assert {["  spasi  "], ""} = Stream.decode(:openai, "", chunk)
+    end
+
     test "finish/2 flushes a line the stream never terminated" do
       buffer = ~s(data: {"choices":[{"delta":{"content":"tail"}}]})
 

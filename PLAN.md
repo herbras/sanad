@@ -1,6 +1,6 @@
 # Sanad execution plan
 
-> STATUS: SELESAI. Slice A sampai D tuntas, 77 tes hijau, `mix compile --warnings-as-errors` bersih, E2E CLI (mix task dan escript) terverifikasi. Sisa opsional: tutorial 1-9, publish Hex, EventMonitor penuh.
+> STATUS: Slice A sampai D tuntas, 77 tes hijau, `mix compile --warnings-as-errors` bersih, E2E CLI (mix task dan escript) terverifikasi. Lanjutan parity ada di Slice 0 sampai I di bawah.
 
 Status legend: `[ ]` todo, `[~]` in progress, `[x]` done.
 
@@ -61,6 +61,57 @@ Gate: acceptance §4.C dan §4.D hijau. PASSED, 68 tests. Chat diuji via `Req.Te
 - [x] D4 Update README: status, API final, divergensi.
 
 Gate: acceptance §4.E hijau (file loading dan `--param`). PASSED, 72 tests termasuk E2E CLI jalur sukses dan gagal.
+
+## Slice 0: toolchain
+
+- [x] 0A `bin/mix`: wrapper Docker (`elixir:1.18-alpine`), uid pemanggil, `MIX_BUILD_ROOT=_build/container` supaya tidak bentrok dengan `_build` native.
+- [x] 0B CI GitHub Actions: `format --check-formatted`, `compile --warnings-as-errors`, `test`.
+
+Gate: `bin/mix test` hijau di mesin tanpa Elixir. PASSED, 77 tests.
+
+## Slice E: event system
+
+Acuan upstream: `lib/roast/event.rb`, `event_monitor.rb`, `task_context.rb`, `output_router.rb`.
+
+- [ ] E1 `Sanad.Event` plus path runtime (`chat(:x) -> {:scope}[0]`), termasuk propagasi lintas proses di `map` paralel.
+- [ ] E2 Dispatch event dan handler yang bisa dipasang: renderer CLI, collector tes.
+- [ ] E3 Emisi `begin`/`end` per cog di runner, `stdout`/`stderr` dari cmd, `block` untuk prompt dan response.
+- [ ] E4 Hubungan dengan `Sanad.Summary`: ringkasan diturunkan dari event, bukan jalur terpisah.
+
+Gate: tes urutan event untuk scope nested, perilaku saat `break!`, dan E2E yang mengecek format path.
+
+## Slice F: scope outputs
+
+Acuan upstream: `execution_manager.rb` (`bind_outputs`, `compute_final_output`).
+
+- [ ] F1 `outputs do ... end` dan `outputs! do ... end` sebagai metadata scope, satu per scope.
+- [ ] F2 Nilai akhir untuk top-level, `call`, tiap child `map`, tiap iterasi `repeat`.
+- [ ] F3 Semantik swallow: `skip!`/`next!` jadi `nil`, `fail!` tetap raise, akses output skipped/not-run ditelan `outputs` tapi dilempar `outputs!`.
+
+Gate: scope tanpa `outputs` berperilaku persis seperti sekarang; test/nested_test.exs tidak berubah hasilnya.
+
+## Slice G: config per-nama dan regex
+
+Acuan upstream: `config_manager.rb` (`config_for`).
+
+- [ ] G1 Surface config bernama dan regex, tanpa merusak bentuk map yang sekarang.
+- [ ] G2 Urutan merge: global, general per-cog, semua regex yang match (berurutan), nama persis, lalu opsi step.
+- [ ] G3 Validasi nilai per scope config dengan `InvalidConfigError`.
+
+Gate: semua contoh di README dan `examples/` resolve identik; tes prioritas merge lengkap.
+
+## Slice H: chat dan agent lanjutan
+
+- [ ] H1 Streaming chat yang mengemit event `stdout` (butuh Slice E).
+- [ ] H2 JSON mode dan tool calls.
+- [ ] H3 Normalisasi session lintas provider agent.
+
+Gate: `Req.Test` untuk stream chunked dan tool call; stub CLI untuk session round-trip.
+
+## Slice I: rilis (ditunda sampai diminta)
+
+- [ ] I1 Tutorial 1-9.
+- [ ] I2 Publish Hex. Dilakukan setelah Slice G karena config adalah perubahan API publik terakhir.
 
 ## Process
 

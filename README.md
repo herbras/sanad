@@ -38,7 +38,19 @@ MVP+ dengan divergensi yang didokumentasikan. Sudah bisa dipakai untuk workflow 
 | Config per-nama dan regex (`chat(:x, ...)`, `chat(~r/.../, ...)`) | Ya |
 | Streaming chat, JSON mode, tool calls, session agent | Ya |
 | Event JSONL untuk dibaca mesin (`--events jsonl`) | Ya |
-| Tutorial 1-9, publish Hex | Ditunda |
+| Tutorial 1-9 (bahasa Indonesia, contoh lintas bidang) | Ya |
+| Publish Hex | Ditunda |
+
+## Belajar dari nol
+
+Ada tutorial sembilan bab berbahasa Indonesia di [`tutorial/`](tutorial/), dari menjalankan
+satu langkah sampai mengerjakan banyak hal secara paralel. Semua contohnya bisa dijalankan
+tanpa API key, dengan contoh kasus dari berbagai bidang: administrasi, keuangan, pengajaran,
+customer service, riset, dan operasional.
+
+```bash
+mix sanad.execute tutorial/01_workflow_pertama/salam.exs
+```
 
 ## Install
 

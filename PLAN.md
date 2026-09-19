@@ -157,7 +157,8 @@ Gate K1: PASSED, 158 tests, termasuk E2E yang mengurai JSONL dari subprocess CLI
 
 ## Slice I: rilis (ditunda sampai diminta)
 
-- [ ] I1 Tutorial 1-9.
+- [x] I1 Tutorial 1-9 di `tutorial/`, bahasa Indonesia sederhana, tiap bab punya contoh yang
+      benar-benar jalan tanpa API key dan contoh kasus dari bidang berbeda.
 - [ ] I2 Publish Hex. Dilakukan setelah Slice G karena config adalah perubahan API publik terakhir.
 
 ## Process

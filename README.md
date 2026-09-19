@@ -59,6 +59,10 @@ mix escript.build && ./sanad examples/local_pipeline.exs
 
 `examples/local_pipeline.exs` memakai `cmd`, `elixir_cog`, `call_cog`, `map_cog` (paralel), dan `repeat_cog`. Tidak butuh network.
 
+`examples/pi_and_claude.exs` menunjukkan jalur lengkapnya: agent `pi` mereview tiap file yang
+berubah, Claude mengubah tiap review jadi satu baris putusan, dengan config per nama dan
+`outputs` per scope. Butuh binary `pi` di PATH dan `ANTHROPIC_API_KEY`.
+
 ## Workflow
 
 ```elixir

@@ -46,7 +46,10 @@ defmodule Sanad.EventCollector do
     end
   end
 
-  defp sweep(_timeout, true), do: 50
+  # A `map` child sends its events straight to this process, so they are
+  # normally enqueued before the parent's workflow stop. The sweep is margin
+  # for a child that was still being scheduled when the parent finished.
+  defp sweep(_timeout, true), do: 100
   defp sweep(timeout, false), do: timeout
 
   defp workflow_over?(%Event{name: [:sanad, :workflow, last]}), do: last in [:stop, :exception]

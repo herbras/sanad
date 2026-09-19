@@ -20,7 +20,8 @@ defmodule Sanad.Context do
             scope_value: nil,
             scope_index: nil,
             path: [],
-            run_id: nil
+            run_id: nil,
+            final_output: nil
 
   @type status :: :ok | :skipped | :failed
 
@@ -36,7 +37,8 @@ defmodule Sanad.Context do
           scope_value: term(),
           scope_index: non_neg_integer() | nil,
           path: Sanad.Event.path(),
-          run_id: reference() | nil
+          run_id: reference() | nil,
+          final_output: term()
         }
 
   @doc "Stores a named output and marks it `:ok`."

@@ -31,6 +31,17 @@ defmodule Sanad.Event do
   Events fire in the process that did the work. Concurrent `map` children
   therefore interleave, and only the events of a single path are totally
   ordered. See `Sanad.Events` for the emission side.
+
+  Span pairing, stated as an invariant a consumer can rely on:
+
+  * every workflow and scope `start` is followed by a `stop` or an
+    `exception`, including scopes cancelled by `break!`, a failing sibling or
+    a timeout, which the parent closes with `control: :cancelled`;
+  * a cog `start` is paired **only if its process survived**. A `map`
+    iteration killed mid-flight leaves the cog spans opened inside it open,
+    because the parent cannot know how far the child got. Consumers that
+    build a span tree must tolerate those orphans; the cancelled scope above
+    them says what happened.
   """
 
   alias Sanad.Event.{Cog, Scope}

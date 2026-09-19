@@ -33,7 +33,10 @@ defmodule Sanad.Runner do
     span = Events.span_start(ctx, :workflow, meta)
 
     try do
-      {ctx, _control} = run_steps(module.__sanad_steps__(), ctx)
+      steps = module.__sanad_steps__()
+      {ctx, control} = run_steps(steps, ctx)
+      {output, _control} = scope_output(module, nil, steps, ctx, control)
+      ctx = %{ctx | final_output: output}
       Events.span_stop(ctx, :workflow, span, Map.put(meta, :statuses, ctx.statuses))
       ctx
     rescue
@@ -87,7 +90,8 @@ defmodule Sanad.Runner do
           statuses: %{},
           failures: %{},
           scope_value: value,
-          scope_index: index
+          scope_index: index,
+          final_output: nil
       }
       |> Events.push_scope(scope, index)
 
@@ -96,7 +100,7 @@ defmodule Sanad.Runner do
 
     try do
       {ctx, control} = run_steps(steps, child)
-      output = final_output(steps, ctx)
+      {output, control} = scope_output(parent.module, scope, steps, ctx, control)
       Events.span_stop(ctx, :scope, span, Map.merge(meta, %{control: control, output: output}))
       {output, ctx, control}
     rescue
@@ -117,7 +121,61 @@ defmodule Sanad.Runner do
     end
   end
 
-  defp final_output(steps, ctx) do
+  # A scope returns whatever its `outputs` block returns, or, with no such
+  # block, the output of its last cog. `outputs` can also end the enclosing
+  # loop, so it may upgrade the control signal to `:break`.
+  defp scope_output(module, scope, steps, %Context{} = ctx, control) do
+    case outputs_spec(module, scope) do
+      nil ->
+        {last_output(steps, ctx), control}
+
+      spec ->
+        case eval_outputs(spec, scope, steps, ctx) do
+          {output, :break} -> {output, :break}
+          {output, _} -> {output, control}
+        end
+    end
+  end
+
+  defp outputs_spec(nil, _scope), do: nil
+
+  defp outputs_spec(module, scope) do
+    if function_exported?(module, :__sanad_outputs__, 0) do
+      Map.get(module.__sanad_outputs__(), scope)
+    end
+  end
+
+  # Upstream swallows reads of cogs that were skipped or never ran, so a
+  # scope ended by `break!` needs no guard code. A name the scope never
+  # declared is a typo and always raises, even from the lenient `outputs`.
+  defp eval_outputs(%{kind: kind, fun: fun}, scope, steps, ctx) do
+    declared = MapSet.new(steps, & &1.name)
+
+    try do
+      {eval_fun(fun, ctx), :ok}
+    rescue
+      error in Sanad.OutputNotFoundError ->
+        if kind == :outputs and MapSet.member?(declared, error.name) do
+          {nil, :ok}
+        else
+          reraise error, __STACKTRACE__
+        end
+
+      error in Sanad.CogSkippedError ->
+        if kind == :outputs, do: {nil, :ok}, else: reraise(error, __STACKTRACE__)
+    catch
+      {:sanad_control, :break, _message} ->
+        {nil, :break}
+
+      {:sanad_control, kind, _message} when kind in [:skip, :next] ->
+        {nil, :ok}
+
+      {:sanad_control, :fail, message} ->
+        raise Sanad.OutputsFailedError, scope: scope, reason: message
+    end
+  end
+
+  defp last_output(steps, ctx) do
     case List.last(steps) do
       nil -> nil
       %{name: name} -> Map.get(ctx.outputs, name)

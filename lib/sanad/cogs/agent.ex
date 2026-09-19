@@ -30,6 +30,7 @@ defmodule Sanad.Cogs.Agent do
   * `:env`, `:timeout`
   """
 
+  alias Sanad.Events
   alias Sanad.Context
   alias Sanad.Output.Agent
 
@@ -49,10 +50,16 @@ defmodule Sanad.Cogs.Agent do
       timeout: Keyword.get(opts, :timeout, :infinity)
     ]
 
+    Events.block(ctx, "prompt", prompt)
+
     case Sanad.Command.run([binary | args], command_opts) do
       {:ok, stdout, stderr, 0} ->
+        response = parse_response(provider, stdout)
+        if stderr != "", do: Events.stderr(ctx, stderr)
+        Events.block(ctx, "response", response)
+
         %Agent{
-          response: parse_response(provider, stdout),
+          response: response,
           provider: provider,
           raw: %{status: 0, session: session_id(provider, stdout), stderr: stderr}
         }

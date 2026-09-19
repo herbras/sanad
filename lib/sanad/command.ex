@@ -7,6 +7,9 @@ defmodule Sanad.Command do
   # temp file (Erlang ports cannot half-close stdin), cwd/env, and an optional
   # timeout with best-effort process termination.
 
+  # Options: `:input`, `:cwd`, `:env`, `:timeout`, and `:on_output`, a
+  # one-argument function called with each stdout chunk as it arrives.
+
   @type result :: {:ok, binary(), binary(), integer()} | {:timeout, binary(), binary()}
 
   @spec run([String.t()], keyword()) :: result()
@@ -15,6 +18,7 @@ defmodule Sanad.Command do
     cwd = Keyword.get(opts, :cwd)
     env = Keyword.get(opts, :env, [])
     timeout = Keyword.get(opts, :timeout, :infinity)
+    on_output = Keyword.get(opts, :on_output)
 
     stdin_path = if is_binary(stdin), do: write_temp(stdin, "stdin"), else: nil
     stderr_path = temp_path("stderr")
@@ -32,7 +36,7 @@ defmodule Sanad.Command do
 
       port = Port.open({:spawn_executable, System.find_executable("sh")}, port_opts)
 
-      case collect(port, timeout, []) do
+      case collect(port, timeout, [], on_output) do
         {:ok, stdout, status} -> {:ok, stdout, read_and_rm(stderr_path), status}
         {:timeout, stdout} -> {:timeout, stdout, read_and_rm(stderr_path)}
       end
@@ -45,10 +49,14 @@ defmodule Sanad.Command do
     raise ArgumentError, "no command provided"
   end
 
-  defp collect(port, timeout, acc) do
+  # `on_output` is called with each chunk as it arrives, so callers can stream
+  # stdout while the command is still running. stderr cannot be streamed: the
+  # shell redirects it to a temp file, which is read once the command exits.
+  defp collect(port, timeout, acc, on_output) do
     receive do
       {^port, {:data, data}} ->
-        collect(port, timeout, [acc, data])
+        if on_output, do: on_output.(data)
+        collect(port, timeout, [acc, data], on_output)
 
       {^port, {:exit_status, status}} ->
         {:ok, IO.iodata_to_binary(acc), status}

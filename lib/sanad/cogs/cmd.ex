@@ -10,16 +10,26 @@ defmodule Sanad.Cogs.Cmd do
   raises `Sanad.CommandTimeoutError`).
   """
 
+  alias Sanad.Events
   alias Sanad.Output.Cmd
 
-  def run(command, opts, _ctx) when is_binary(command) do
+  def run(command, opts, ctx) when is_binary(command) do
     cwd = Keyword.get(opts, :cwd)
     env = Keyword.get(opts, :env, [])
     timeout = Keyword.get(opts, :timeout, :infinity)
     fail_on_error? = Keyword.get(opts, :fail_on_error, true)
 
-    case Sanad.Command.run(["sh", "-c", command], cwd: cwd, env: env, timeout: timeout) do
+    command_opts = [
+      cwd: cwd,
+      env: env,
+      timeout: timeout,
+      on_output: &Events.stdout(ctx, &1)
+    ]
+
+    case Sanad.Command.run(["sh", "-c", command], command_opts) do
       {:ok, stdout, stderr, status} ->
+        emit_stderr(ctx, stderr)
+
         if status != 0 and fail_on_error? do
           Sanad.ControlFlow.fail!("command exited with status #{status}: #{command}")
         end
@@ -27,6 +37,8 @@ defmodule Sanad.Cogs.Cmd do
         %Cmd{stdout: stdout, stderr: stderr, status: status}
 
       {:timeout, stdout, stderr} ->
+        emit_stderr(ctx, stderr)
+
         raise Sanad.CommandTimeoutError,
           command: command,
           timeout: timeout,
@@ -38,4 +50,7 @@ defmodule Sanad.Cogs.Cmd do
   def run(other, _opts, _ctx) do
     raise ArgumentError, "cmd expects a shell command string, got: #{inspect(other)}"
   end
+
+  defp emit_stderr(_ctx, ""), do: :ok
+  defp emit_stderr(ctx, stderr), do: Events.stderr(ctx, stderr)
 end

@@ -34,6 +34,20 @@ defmodule Sanad.E2ETest do
     assert output =~ "results: [1, 2, 3, nil]"
   end
 
+  test "run events are rendered as the workflow runs, and --quiet turns them off" do
+    {output, 0} = run_cli(["examples/local_pipeline.exs"])
+
+    assert output =~ "🔥🔥🔥 Workflow Starting"
+    assert output =~ "cmd(:echo) ❯ hello"
+    assert output =~ "map(:lengths) -> {:string_length}[2] Complete"
+    assert output =~ "🔥🔥🔥 Workflow Complete"
+
+    {quiet, 0} = run_cli(["examples/local_pipeline.exs", "--quiet"])
+
+    refute quiet =~ "Workflow Starting"
+    assert quiet =~ "Sanad workflow finished in"
+  end
+
   test "named scopes, call_cog and from/2 (ported upstream tutorial)" do
     {output, status} = run_cli(["examples/reusable_scopes.exs", "--module", "ReusableScopes"])
 

@@ -38,6 +38,7 @@ defmodule Sanad.Cogs.Chat do
   """
 
   alias Sanad.Config
+  alias Sanad.Events
   alias Sanad.Output.Chat
 
   @providers [:openai, :anthropic, :gemini, :perplexity]
@@ -57,9 +58,13 @@ defmodule Sanad.Cogs.Chat do
         receive_timeout: Keyword.get(opts, :timeout, 60_000)
       ] ++ Keyword.get(opts, :req_options, [])
 
+    Events.block(ctx, "prompt", prompt)
+
     case Req.post(request.url, options) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
-        %Chat{response: extract_text(provider, body), model: model, provider: provider, raw: body}
+        response = extract_text(provider, body)
+        Events.block(ctx, "response", response)
+        %Chat{response: response, model: model, provider: provider, raw: body}
 
       {:ok, %{status: status, body: body}} ->
         raise Sanad.ChatError, provider: provider, status: status, body: body

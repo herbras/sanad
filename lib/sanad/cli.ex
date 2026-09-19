@@ -14,7 +14,9 @@ defmodule Sanad.CLI do
     {:ok, _} = Application.ensure_all_started(:req)
 
     {opts, rest, invalid} =
-      OptionParser.parse(args, strict: [module: :string, param: :keep, help: :boolean])
+      OptionParser.parse(args,
+        strict: [module: :string, param: :keep, help: :boolean, quiet: :boolean]
+      )
 
     cond do
       opts[:help] ->
@@ -57,6 +59,8 @@ defmodule Sanad.CLI do
       System.halt(1)
     end
 
+    unless opts[:quiet], do: Sanad.Events.Renderer.attach()
+
     started = System.monotonic_time(:millisecond)
 
     ctx =
@@ -98,6 +102,7 @@ defmodule Sanad.CLI do
     Options:
       --module   module defined in the file (default: inferred from filename)
       --param    workflow param, repeatable (available via params(ctx))
+      --quiet    do not render run events to stderr
       --help     show this help
 
     Env:
